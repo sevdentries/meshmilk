@@ -13,11 +13,6 @@ label1 = Label(root, text="This is a test of the tkinter system, enter name belo
 button1 = Button(root, text="greet button", command=lambda:print("Hello, "+entry1.get()+"!"))
 entry1 = Entry(root, text="What is your name?")
 
-def selectclear(event):
-    if entry1.get() == "What is your name?":
-        entry1.configure(text="")
-
-entry1.bind("<Button-1>", selectclear)
 
 label1.pack()
 button1.pack()

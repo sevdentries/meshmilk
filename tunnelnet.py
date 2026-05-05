@@ -399,9 +399,12 @@ def refreshnet():
             for peer_key, peer_data in peers.items():
                 hostname = peer_data.get("HostName", "")
                 ips = peer_data.get("TailscaleIPs", [])
+                online = peer_data.get("Online", False)
                 if hostname and ips:
-                    DEVICES[hostname] = ips[0]
-            
+                    DEVICES[hostname] = {
+                        "ip": ips[0],
+                        "online": online
+                    }
             # 2. Grab the local device (Self)
             self_node = JSON.get("Self")
             if self_node:
@@ -454,19 +457,43 @@ def refreshnet():
             userlabel.config(text=f"Welcome, {selfname}")
             IPlabel.config(text=f"Logged in from IP {selfip}")
 
-        USERrow = 1
-        for user, ip in DEVICES.items():
-            global DEVICElabel
-            if (user, ip) in SELF.items():
-                pass
-            else:
-                DEVICElabel = tk.Label(serverframe, text=str(user), font=("Arial", 12))
-                DEVICElabel.grid(column=1, row=USERrow, sticky="w")
+####### ONLINE STATUS CHECK CURRENTLY ONLY WORKS ON MAC; NEED BACKEND SUPPORT DONE BEFORE INTEGRATING TO WINDOWS/LINUX
+        if system == 'Darwin':
+            USERrow = 1
+            for user, data in DEVICES.items():
+                if user in SELF:
+                    pass
+                else:
+                    online = data.get('online', False)
+                    if online == False:
+                        status = 'Offline'
+                    else:
+                        status = 'Online'
+                    ip = data.get('ip','')
 
-                IPDEVICElabel = tk.Label(serverframe, text=str(ip), font=("Arial", 12))
-                IPDEVICElabel.grid(column=2, row=USERrow, sticky="w")
-                USERrow += 1
+                    STATUSlabel = tk.Label(serverframe, text=str(status), font=("Arial", 12))
+                    STATUSlabel.grid(column=1, row=USERrow, sticky="w")
 
+                    DEVICElabel = tk.Label(serverframe, text=str(user), font=("Arial", 12))
+                    DEVICElabel.grid(column=2, row=USERrow, sticky="w")
+
+                    IPDEVICElabel = tk.Label(serverframe, text=str(ip), font=("Arial", 12))
+                    IPDEVICElabel.grid(column=3, row=USERrow, sticky="w")
+                    USERrow += 1
+        ### WINDOWS AND LINUX HAVE PREVIOUS, DEVICE/IP-ONLY CODE
+        else: 
+            USERrow = 1
+            for user, ip in DEVICES.items():
+                if user in SELF:
+                    pass
+                else:
+                    DEVICElabel = tk.Label(serverframe, text=str(user), font=("Arial", 12))
+                    DEVICElabel.grid(column=1, row=USERrow, sticky="w")
+
+                    IPDEVICElabel = tk.Label(serverframe, text=str(ip), font=("Arial", 12))
+                    IPDEVICElabel.grid(column=2, row=USERrow, sticky="w")
+                    USERrow += 1
+                
     except Exception as e:
         print("Error:", e)
 
@@ -739,6 +766,7 @@ serverframe.grid(column=0, row=3, columnspan=3, sticky='nsew')
 serverframe.grid_columnconfigure(0, weight=1)
 serverframe.grid_columnconfigure(1, weight=3)
 serverframe.grid_columnconfigure(2, weight=3)
+serverframe.grid_columnconfigure(3, weight=3)
 serverframe.grid_rowconfigure(0, weight=1)
 for i in range(100):
     serverframe.grid_rowconfigure(i+1, weight=2)
@@ -810,7 +838,7 @@ def resize_text(event):
         logo_size = max(20, int(event.width / 40))
         namelabel.config(font=("Arial", logo_size))
         userlabel.config(font=("Arial", int(logo_size/2)))
-        IPlabel.config(font=("Arial", int(logo_size/3)))
+        IPlabel.config(font=("Arial", int(logo_size*2/5)))
 main.bind("<Configure>", resize_text) # allows the resize gets detected
 
 main.withdraw()

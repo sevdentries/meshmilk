@@ -171,32 +171,99 @@ DEVICES = {}
 #must be requested at user login.
 #physical control of local API can be done using cli, my idea is to run
 #a daemon thread to do all the terminal stuff using schlex.
-if system == "Darwin":
+# ---- Windows: queue-based cmd.exe wrapper ----
+class WindowsCmdQueue:
+    """Queue-based wrapper for persistent Windows cmd.exe interaction.
+    Replaces pexpect PopenSpawn with proper output queue for reliable
+    command execution and output capture on Windows."""
+    def __init__(self):
+        self.proc = subprocess.Popen(
+            "cmd.exe",
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1
+        )
+        self._output_queue = queue.Queue()
+        self._reader = threading.Thread(target=self._read_loop, daemon=True)
+        self._reader.start()
+
+    def _read_loop(self):
+        """Continuously read stdout lines into the output queue."""
+        try:
+            for line in iter(self.proc.stdout.readline, ''):
+                self._output_queue.put(line.rstrip('\r\n'))
+        except (ValueError, OSError):
+            pass
+
+    def execute(self, cmd, timeout=10):
+        """Send a command and collect output until a sentinel marker."""
+        import hashlib
+        marker = f"__TNMARKER_{hashlib.md5(str(time.time()).encode()).hexdigest()[:8]}__"
+        self.proc.stdin.write(f"{cmd}\r\n")
+        self.proc.stdin.write(f"echo {marker}\r\n")
+        self.proc.stdin.flush()
+        lines = []
+        end_time = time.time() + timeout
+        while time.time() < end_time:
+            try:
+                line = self._output_queue.get(timeout=0.5)
+                if marker in line:
+                    break
+                lines.append(line)
+            except queue.Empty:
+                continue
+        output_lines = []
+        cmd_stripped = cmd.strip()
+        for line in lines:
+            if line.strip() == cmd_stripped:
+                continue
+            output_lines.append(line)
+        return "\n".join(output_lines).strip()
+
+    def close(self):
+        try:
+            self.proc.stdin.write("exit\r\n")
+            self.proc.stdin.flush()
+            self.proc.terminate()
+        except Exception:
+            pass
+
+# Shell initialization — separated by OS
+win_cmd = None
+if system == "Linux":
+    inject = pexpect.spawn("/bin/bash", encoding="utf-8")
+    inject.logfile = sys.stdout
+elif system == "Darwin":
     # macOS: use subprocess instead of pexpect — no sudo needed,
     # and pexpect + zsh mangles multi-line output (bracketed paste, ANSI codes).
     inject = None
-else:
-    if system == "Windows":
-        try:
-            from pexpect.popen_spawn import PopenSpawn
-            inject = PopenSpawn("cmd.exe", encoding="utf-8")
-        except (ImportError, Exception):
-            inject = None
-    else:
-        shell_path = "/bin/zsh" if system == "Darwin" else "/bin/bash"
-        inject = pexpect.spawn(shell_path, encoding="utf-8")
-
-if inject:
-    inject.logfile = sys.stdout
+elif system == "Windows":
+    # Windows: use queue-based cmd.exe wrapper for reliable output capture
+    inject = None
+    try:
+        win_cmd = WindowsCmdQueue()
+    except Exception as e:
+        print(f"Windows cmd queue init failed: {e}")
+        win_cmd = None
 
 import time # Needed for timestamps
-def send_packet(target_ip, message):
+def send_packet(target_device, message):
     """
     Helper to queue a message for sending.
+    target_device: hostname from DEVICES dict, or raw IP as fallback.
     """
+    device_entry = DEVICES.get(target_device, target_device)
+    # DEVICES stores dicts on Mac ({ip, online}) and plain IP strings on Linux/Windows
+    if isinstance(device_entry, dict):
+        target_ip = device_entry.get("ip", target_device)
+    else:
+        target_ip = device_entry
+    sender_name = TAILNAME or socket.gethostname()
     payload = {
-        "destination": target_ip, # The user said "destination device name" but we need IP to connect
-        "sender": TAILNAME or socket.gethostname(),
+        "destination": target_device,
+        "sender": sender_name,
         "message": message,
         "timestamp": str(time.time())
     }
@@ -288,7 +355,7 @@ def bash_worker():
         if cmd is None:
             break
         try:
-            # ----- macOS path: use subprocess (no sudo, clean output) -----
+            # ---- macOS: subprocess, no sudo, clean output ----
             if system == "Darwin":
                 if not SUDOAUTH:
                     SUDOAUTH = True
@@ -308,40 +375,49 @@ def bash_worker():
                         JSON = {}
                         print("Warning: tailscale returned non-JSON output")
                     JSONFLAG = False
-                continue
+
+            # ---- Windows: queue-based cmd execution ----
+            elif system == "Windows":
+                if not SUDOAUTH:
+                    SUDOAUTH = True
+                    print("Windows shell initialized")
+                
+                if win_cmd:
+                    STDOUT = win_cmd.execute(cmd, timeout=30)
+                else:
+                    result = subprocess.run(
+                        cmd, shell=True, capture_output=True, text=True, timeout=30
+                    )
+                    STDOUT = result.stdout.strip()
+                    if result.returncode != 0 and result.stderr:
+                        print(f"cmd stderr: {result.stderr.strip()}")
+                
+                if JSONFLAG:
+                    try:
+                        JSON = json.loads(STDOUT)
+                    except (json.JSONDecodeError, ValueError):
+                        JSON = {}
+                        print("Warning: tailscale returned non-JSON output")
+                    JSONFLAG = False
+
+            # ---- Linux: ORIGINAL pexpect code (UNTOUCHED) ----
             else:
-                # ----- Windows / Linux path: use pexpect inject (ORIGINAL CODE) -----
                 # Authenticate sudo ONCE at the start, not for every command
                 if not SUDOAUTH:
-                    if system == "Windows":
-                        # Windows doesn't use sudo in the same way; 
-                        # for now, we assume the process has necessary rights
-                        # or we could implement runas logic here.
-                        SUDOAUTH = True 
-                        print("Windows shell initialized")
-                    else:
-                        try:
-                            print(f"SUDO not detected on {system}! Injecting...")
-                            inject.sendline("sudo -s")
-                            inject.expect(r"[Pp]assword", timeout=5)
-                            inject.sendline(SUDO)
-                            # Mac/Linux prompts might differ; # is common for root
-                            inject.expect([r"# ", r"\$ "], timeout=5)
-                            SUDOAUTH = True
-                            print("Sudo authenticated successfully")
-                        except Exception as E:
-                            print("sudError: ", E)
-                            SUDOAUTH = False
+                    try:
+                        print(f"SUDO not detected on {system}! Injecting...")
+                        inject.sendline("sudo -s")
+                        inject.expect(r"[Pp]assword", timeout=5)
+                        inject.sendline(SUDO)
+                        inject.expect([r"# ", r"\$ "], timeout=5)
+                        SUDOAUTH = True
+                        print("Sudo authenticated successfully")
+                    except Exception as E:
+                        print("sudError: ", E)
+                        SUDOAUTH = False
                 
-                # Only send the command
-                if system == "Windows":
-                    # For Windows commands, we might need a different echo or prompt check
-                    inject.sendline(cmd)
-                    # cmd.exe usually ends with >
-                    inject.expect(r">", timeout=5)
-                else:
-                    inject.sendline(cmd)
-                    inject.expect([r"# ", r"\$ "], timeout=5)
+                inject.sendline(cmd)
+                inject.expect([r"# ", r"\$ "], timeout=5)
                 
                 STDOUT = inject.before.split("\r\n", 1)[-1]
                 STDOUT = ansi_escape.sub('', STDOUT).strip()
@@ -372,9 +448,8 @@ def refreshnet():
         JSONFLAG = True
         cmd_queue.put("tailscale status --json")
         cmd_queue.join()
+        # ---- macOS: custom JSON handling without jq ----
         if system == "Darwin":
-            # ----- macOS path: custom json handling without jq -----
-            # Check Health - it may be a list or a string depending on the state
             health = JSON.get("Health", [])
             if isinstance(health, list):
                 health_stopped = any("stopped" in str(h).lower() for h in health)
@@ -393,18 +468,14 @@ def refreshnet():
             if current_tailnet:
                 TAILNAME = current_tailnet.get("Name", "")
 
-            ## Parse peers from JSON directly instead of using jq (cross-platform)
-            # 1. Grab other peers on the network
             peers = JSON.get("Peer") or {}
             for peer_key, peer_data in peers.items():
                 hostname = peer_data.get("HostName", "")
                 ips = peer_data.get("TailscaleIPs", [])
                 online = peer_data.get("Online", False)
                 if hostname and ips:
-                    DEVICES[hostname] = {
-                        "ip": ips[0],
-                        "online": online
-                    }
+                    DEVICES[hostname] = {"ip": ips[0], "online": online}
+            
             # 2. Grab the local device (Self)
             self_node = JSON.get("Self")
             if self_node:
@@ -412,12 +483,49 @@ def refreshnet():
                 self_ips = self_node.get("TailscaleIPs", [])
                 if self_hostname and self_ips:
                     SELF[self_hostname] = self_ips[0]
-                    # Also add Self to the devices list so it's logged/visible
+                    DEVICES[self_hostname] = {"ip": self_ips[0], "online": True}
+            
+            print(f"{len(DEVICES)} device(s) found")
+
+        # ---- Windows: JSON parsing without jq (no jq on Windows) ----
+        elif system == "Windows":
+            health = JSON.get("Health", [])
+            if isinstance(health, list):
+                health_stopped = any("stopped" in str(h).lower() for h in health)
+            else:
+                health_stopped = "stopped" in str(health).lower()
+            
+            if health_stopped or JSON.get("BackendState") == "Stopped":
+                print("tailscale service stopped... restarting...")
+                cmd_queue.put("tailscale up")
+                cmd_queue.join()
+                JSONFLAG = True
+                cmd_queue.put("tailscale status --json")
+                cmd_queue.join()
+            
+            current_tailnet = JSON.get("CurrentTailnet")
+            if current_tailnet:
+                TAILNAME = current_tailnet.get("Name", "")
+
+            peers = JSON.get("Peer") or {}
+            for peer_key, peer_data in peers.items():
+                hostname = peer_data.get("HostName", "")
+                ips = peer_data.get("TailscaleIPs", [])
+                if hostname and ips:
+                    DEVICES[hostname] = ips[0]
+            
+            self_node = JSON.get("Self")
+            if self_node:
+                self_hostname = self_node.get("HostName", "")
+                self_ips = self_node.get("TailscaleIPs", [])
+                if self_hostname and self_ips:
+                    SELF[self_hostname] = self_ips[0]
                     DEVICES[self_hostname] = self_ips[0]
             
             print(f"{len(DEVICES)} device(s) found")
+
+        # ---- Linux: ORIGINAL code (UNTOUCHED) ----
         else:
-            # ----- Windows / Linux path (ORIGINAL CODE) -----
             if "Tailscale is stopped." in JSON["Health"]:
                 print("tailscale service stopped... restarting...")
                 cmd_queue.put("tailscale up")
@@ -457,7 +565,13 @@ def refreshnet():
             userlabel.config(text=f"Welcome, {selfname}")
             IPlabel.config(text=f"Logged in from IP {selfip}")
 
-####### ONLINE STATUS CHECK CURRENTLY ONLY WORKS ON MAC; NEED BACKEND SUPPORT DONE BEFORE INTEGRATING TO WINDOWS/LINUX
+        ####### ONLINE STATUS CHECK CURRENTLY ONLY WORKS ON MAC; NEED BACKEND SUPPORT DONE BEFORE INTEGRATING TO WINDOWS/LINUX
+        # Clear existing user rows in serverframe (keep row 0 which is usertitlelabel)
+        for widget in serverframe.winfo_children():
+            info = widget.grid_info()
+            if info and str(info.get('row', '0')) != '0':
+                widget.destroy()
+
         if system == 'Darwin':
             USERrow = 1
             for user, data in DEVICES.items():
@@ -469,7 +583,7 @@ def refreshnet():
                         status = 'Offline'
                     else:
                         status = 'Online'
-                    ip = data.get('ip','')
+                    ip = data.get('ip', '')
 
                     STATUSlabel = tk.Label(serverframe, text=str(status), font=("Arial", 12))
                     STATUSlabel.grid(column=1, row=USERrow, sticky="w")
@@ -573,14 +687,56 @@ bash_thread.start()
 
 def messaging_service():
     """
-    Handles sending, receiving, and acknowledging messages.
+    Cross-platform TCP messaging service.
+    Handles sending, receiving, and acknowledging messages over MESG_PORT.
+    Both sender and receiver store chat logs and confirm delivery via ACK.
     """
+    def handle_connection(conn, addr):
+        """Handle a single incoming TCP connection in its own thread."""
+        with conn:
+            data = conn.recv(4096).decode('utf-8')
+            if not data:
+                return
+            try:
+                msg = json.loads(data)
+                sender = msg.get("sender", "Unknown")
+                channel = sender  # early stage: channel name = sender device name
+
+                # Store in chat_logs: chat_logs[channel][timestamp] = {raw, sender, timestamp, read}
+                if channel not in chat_logs:
+                    chat_logs[channel] = {}
+
+                timestamp = msg.get("timestamp", str(time.time()))
+                chat_logs[channel][timestamp] = {
+                    "raw": msg.get("message", ""),
+                    "sender": sender,
+                    "timestamp": timestamp,
+                    "read": False
+                }
+
+                # ACK: reply repeating and acknowledging the previous message
+                ack = {
+                    "status": "ACK",
+                    "received_msg": msg.get("message", ""),
+                    "original_timestamp": timestamp,
+                    "ack_timestamp": str(time.time()),
+                    "sender": TAILNAME or socket.gethostname()
+                }
+                conn.sendall(json.dumps(ack).encode('utf-8'))
+                print(f"Message received from {sender} ({addr[0]}), ACK sent.")
+            except Exception as e:
+                print(f"Listener error: {e}")
+
     def listener():
-        # TCP Listener Thread — retry bind in case port is in TIME_WAIT
+        """TCP Listener Thread — binds to MESG_PORT, spawns handler per connection."""
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        # SO_REUSEPORT only available on some OSes (Linux, macOS)
         if hasattr(socket, 'SO_REUSEPORT'):
-            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+            try:
+                s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+            except OSError:
+                pass  # Windows doesn't support SO_REUSEPORT
         for attempt in range(5):
             try:
                 s.bind(('0.0.0.0', MESG_PORT))
@@ -597,59 +753,42 @@ def messaging_service():
         with s:
             while True:
                 conn, addr = s.accept()
-                with conn:
-                    data = conn.recv(4096).decode('utf-8')
-                    if data:
-                        try:
-                            msg = json.loads(data)
-                            sender = msg.get("sender", "Unknown")
-                            channel = sender # early stage: channel name is sender name
-                            
-                            # Format for chatlog
-                            # chat_logs[channel][timestamp] = {msg, sender, time, read}
-                            if channel not in chat_logs:
-                                chat_logs[channel] = {}
-                            
-                            timestamp = msg.get("timestamp", str(time.time()))
-                            chat_logs[channel][timestamp] = {
-                                "raw": msg.get("message", ""),
-                                "sender": sender,
-                                "timestamp": timestamp,
-                                "read": False
-                            }
-                            
-                            # ACK with a reply repeating and acknowledging the message
-                            ack = {
-                                "status": "ACK",
-                                "received_msg": msg.get("message", ""),
-                                "original_timestamp": timestamp,
-                                "sender": TAILNAME or "LocalHost"
-                            }
-                            conn.sendall(json.dumps(ack).encode('utf-8'))
-                            print(f"Message received from {sender}, ACK sent.")
-                        except Exception as e:
-                            print(f"Listener error: {e}")
+                threading.Thread(
+                    target=handle_connection, args=(conn, addr), daemon=True
+                ).start()
 
     # Start the listener thread
     threading.Thread(target=listener, daemon=True).start()
 
-    # Worker for sending messages
+    # Worker loop for sending messages from msg_queue
     while True:
         target_ip, payload = msg_queue.get()
-        if target_ip is None: break
+        if target_ip is None:
+            break
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 s.settimeout(5)
                 s.connect((target_ip, MESG_PORT))
                 s.sendall(json.dumps(payload).encode('utf-8'))
-                
-                # Wait for ACK
+
+                # Wait for ACK from receiver
                 ack_data = s.recv(4096).decode('utf-8')
                 if ack_data:
                     ack = json.loads(ack_data)
-                    print(f"Message acknowledged by {target_ip}: {ack.get('status')}")
-                    # Update local log to show it was acknowledged? 
-                    # User said "both devices should have acknowledged that the msg has been received"
+                    if ack.get("status") == "ACK":
+                        # Both devices now acknowledge: store in sender's chat_logs
+                        dest_name = payload.get("destination", target_ip)
+                        if dest_name not in chat_logs:
+                            chat_logs[dest_name] = {}
+                        chat_logs[dest_name][payload["timestamp"]] = {
+                            "raw": payload["message"],
+                            "sender": payload["sender"],
+                            "timestamp": payload["timestamp"],
+                            "read": True  # sender always "read" their own message
+                        }
+                        print(f"Message to {dest_name} ({target_ip}) ACK confirmed.")
+                    else:
+                        print(f"Unexpected ACK status from {target_ip}: {ack}")
         except Exception as e:
             print(f"Send error to {target_ip}: {e}")
         finally:
@@ -726,10 +865,7 @@ except:
     logoimgdata = tk.PhotoImage(file=logoimgraw)
 
 # Images variables
- # code for file with any dimensions.
-bgimg = bgimgdata.zoom(1,1)
 bgimg = bgimgdata.subsample(1,5)
-
 
 logoimg = logoimgdata.subsample(5,5)
 
@@ -893,6 +1029,23 @@ elif system == "Darwin":
             softlogbutton.grid(row=2, column=1, sticky=NSEW)
     except Exception as e:
         print(f"Mac auto-check error: {e}")
+
+elif system == "Windows":
+    # Windows doesn't need sudo — Tailscale runs as a system service.
+    # Auto-authenticate and check if tailscale is already running.
+    SUDOAUTH = True
+    JSONFLAG = True
+    cmd_queue.put("tailscale status --json")
+    cmd_queue.join()
+    try:
+        if isinstance(JSON, dict) and JSON.get("BackendState") == "Running":
+            initialize.add(softlogtab, text="Soft Login")
+            softloglabel.grid(row=0, column=1, sticky=NSEW)
+            softloglabel2.grid(row=1, column=1, sticky=NSEW)
+            softlogbutton.grid(row=2, column=1, sticky=NSEW)
+    except Exception as e:
+        print(f"Windows auto-check error: {e}")
+
 
 joinlabel.grid(column=1, row=0 ,sticky=NSEW)
 joinlabel2.grid(column=1, row=1 ,sticky=NSEW)

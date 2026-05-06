@@ -172,10 +172,14 @@ DEVICES = {}
 #physical control of local API can be done using cli, my idea is to run
 #a daemon thread to do all the terminal stuff using schlex.
 # ---- Windows: queue-based cmd.exe wrapper ----
+# Class definition is safe on all platforms; only instantiated on Windows (see shell init below)
 class WindowsCmdQueue:
     """Queue-based wrapper for persistent Windows cmd.exe interaction.
     Replaces pexpect PopenSpawn with proper output queue for reliable
-    command execution and output capture on Windows."""
+    command execution and output capture on Windows.
+    
+    Uses @echo off to suppress cmd.exe echoing every command back,
+    drains the startup banner on init, and filters prompt lines from output."""
     def __init__(self):
         self.proc = subprocess.Popen(
             "cmd.exe",
@@ -188,6 +192,10 @@ class WindowsCmdQueue:
         self._output_queue = queue.Queue()
         self._reader = threading.Thread(target=self._read_loop, daemon=True)
         self._reader.start()
+        # Turn off echoing so cmd.exe doesn't repeat every command in stdout
+        self._send_raw("@echo off\r\n")
+        # Drain the startup banner (copyright notice, initial prompt, echo off echo)
+        self._drain_banner()
 
     def _read_loop(self):
         """Continuously read stdout lines into the output queue."""
@@ -197,13 +205,33 @@ class WindowsCmdQueue:
         except (ValueError, OSError):
             pass
 
+    def _send_raw(self, text):
+        """Write raw text to cmd.exe stdin."""
+        self.proc.stdin.write(text)
+        self.proc.stdin.flush()
+
+    def _drain_banner(self):
+        """Drain the cmd.exe startup banner by sending a known marker
+        and consuming everything until it appears."""
+        marker = "__TNBOOT__"
+        self._send_raw(f"echo {marker}\r\n")
+        # Read and discard lines until we see the marker
+        end_time = time.time() + 5
+        while time.time() < end_time:
+            try:
+                line = self._output_queue.get(timeout=0.5)
+                if marker in line:
+                    break
+            except queue.Empty:
+                continue
+
     def execute(self, cmd, timeout=10):
-        """Send a command and collect output until a sentinel marker."""
+        """Send a command and collect its clean output.
+        Uses a unique sentinel marker to detect end-of-output."""
         import hashlib
         marker = f"__TNMARKER_{hashlib.md5(str(time.time()).encode()).hexdigest()[:8]}__"
-        self.proc.stdin.write(f"{cmd}\r\n")
-        self.proc.stdin.write(f"echo {marker}\r\n")
-        self.proc.stdin.flush()
+        self._send_raw(f"{cmd}\r\n")
+        self._send_raw(f"echo {marker}\r\n")
         lines = []
         end_time = time.time() + timeout
         while time.time() < end_time:
@@ -214,18 +242,29 @@ class WindowsCmdQueue:
                 lines.append(line)
             except queue.Empty:
                 continue
+        # Filter out noise: echoed commands, prompt lines, blank lines from echo
         output_lines = []
         cmd_stripped = cmd.strip()
         for line in lines:
-            if line.strip() == cmd_stripped:
+            stripped = line.strip()
+            # Skip empty lines
+            if not stripped:
+                continue
+            # Skip echoed command (cmd.exe may still echo despite @echo off in some edge cases)
+            if stripped == cmd_stripped:
+                continue
+            # Skip prompt lines like "C:\Users\User\path>"
+            if stripped.endswith('>') and '\\' in stripped:
+                continue
+            # Skip lines that are just the prompt + echoed command
+            if '>' in stripped and cmd_stripped in stripped:
                 continue
             output_lines.append(line)
         return "\n".join(output_lines).strip()
 
     def close(self):
         try:
-            self.proc.stdin.write("exit\r\n")
-            self.proc.stdin.flush()
+            self._send_raw("exit\r\n")
             self.proc.terminate()
         except Exception:
             pass
@@ -594,7 +633,20 @@ def refreshnet():
                     IPDEVICElabel = tk.Label(serverframe, text=str(ip), font=("Arial", 12))
                     IPDEVICElabel.grid(column=3, row=USERrow, sticky="w")
                     USERrow += 1
-        ### WINDOWS AND LINUX HAVE PREVIOUS, DEVICE/IP-ONLY CODE
+        ### WINDOWS: device/IP only (no online status yet)
+        elif system == 'Windows':
+            USERrow = 1
+            for user, ip in DEVICES.items():
+                if user in SELF:
+                    pass
+                else:
+                    DEVICElabel = tk.Label(serverframe, text=str(user), font=("Arial", 12))
+                    DEVICElabel.grid(column=1, row=USERrow, sticky="w")
+
+                    IPDEVICElabel = tk.Label(serverframe, text=str(ip), font=("Arial", 12))
+                    IPDEVICElabel.grid(column=2, row=USERrow, sticky="w")
+                    USERrow += 1
+        ### LINUX: ORIGINAL device/IP-only code (UNTOUCHED)
         else: 
             USERrow = 1
             for user, ip in DEVICES.items():

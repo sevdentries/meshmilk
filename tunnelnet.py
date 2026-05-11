@@ -608,7 +608,6 @@ def refreshnet():
         userlabel.config(text=f"Welcome, {selfname}")
         IPlabel.config(text=f"Logged in from IP {selfip}")
 
-        ####### ONLINE STATUS CHECK CURRENTLY ONLY WORKS ON MAC; NEED BACKEND SUPPORT DONE BEFORE INTEGRATING TO WINDOWS/LINUX
         # Clear existing user rows in serverframe (keep row 0 which is usertitlelabel)
         for widget in serverframe.winfo_children():
             info = widget.grid_info()
@@ -918,11 +917,8 @@ except:
 
 # Images variables
 bgimg = bgimgdata.subsample(1,5)
-
 logoimg = logoimgdata.subsample(5,5)
-
 sendimg = sendimgdata.subsample(2,4)
-
 
 # Background Image
 bgimglabel = tk.Label(main, image=bgimg, bg='lightgray', border=0)
@@ -965,7 +961,10 @@ for i in range(100):
 usertitlelabel = tk.Label(serverframe, text='Users Found', font=200)
 usertitlelabel.grid(column=0, row=0, columnspan=2, sticky=NW, padx=20, pady=20)
 
-refreshbtn = tk.Button(serverframe, text='Refresh', command=refreshnet)
+def refresh():
+    refreshnet()
+
+refreshbtn = tk.Button(serverframe, text='Refresh', command=refresh)
 refreshbtn.grid(column=3, row=0, sticky=W, padx=20, pady=20)
 
 # Chat frame (all of right) 

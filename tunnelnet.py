@@ -524,7 +524,7 @@ def refreshnet():
                 self_ips = self_node.get("TailscaleIPs", [])
                 if self_hostname and self_ips:
                     SELF[self_hostname] = self_ips[0]
-                    DEVICES[self_hostname] = {"ip": self_ips[0], "online": True}
+                    DEVICES[self_hostname] = self_ips[0]
             
             print(f"{len(DEVICES)} device(s) found")
 
@@ -553,7 +553,7 @@ def refreshnet():
                 hostname = peer_data.get("HostName", "")
                 ips = peer_data.get("TailscaleIPs", [])
                 if hostname and ips:
-                    DEVICES[hostname] = ips[0]
+                    DEVICES[hostname] = {"ip": ips[0], "online": online}
             
             self_node = JSON.get("Self")
             if self_node:

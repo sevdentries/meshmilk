@@ -931,7 +931,7 @@ bgimg = bgimgdata.subsample(1,5)
 
 logoimg = logoimgdata.subsample(5,5)
 
-sendimg = sendimgdata.subsample(6,6)
+sendimg = sendimgdata.subsample(2,4)
 
 
 # Background Image
@@ -1032,7 +1032,7 @@ inputframe.grid(column=0, row=1, columnspan=2, sticky='nsew')
 textbox = tk.Entry(inputframe, bg=TEXTBG, insertbackground='white', selectbackground='white', fg='white')
 textbox.grid(column=0, row=0, sticky='ew', padx=5, pady=10)
 textbox.bind("<Return>", lambda event:sendMessage()) # allows pressing enter to chat
-sendbtn = tk.Button(inputframe, image=sendimg, text='Send', bg=TEXTBG, fg=TEXTBG, command=sendMessage)
+sendbtn = tk.Button(inputframe, image=sendimg, text='Send', bg=TEXTBG, fg=TEXTBG, command=sendMessage, width = 50, height = 15)
 sendbtn.grid(column=1, row=0, sticky='ew', pady=10, padx=(0,5))
 
 # Other Functions

@@ -1003,7 +1003,7 @@ for a in range(3):
 
 hometitle = Label(homeframe, text="Please select a device to connect to...")
 
-
+#CONTINUE HERE ALTON ########################################################################################
 
 #chatframes.extend([chatframe1, chatframe2, chatframe3]) #Puts chatframe1-3 into chatframes list
 chattab.grid(column=0, row=0, columnspan=2, sticky='nsew', padx=20, pady=20)

@@ -527,7 +527,7 @@ def refreshnet():
                 self_ips = self_node.get("TailscaleIPs", [])
                 if self_hostname and self_ips:
                     SELF[self_hostname] = self_ips[0]
-                    DEVICES[self_hostname] = {"ip": self_ips[0], "online": True}
+                    DEVICES[self_hostname] = self_ips[0]
             
             print(f"{len(DEVICES)} device(s) found")
 
@@ -555,8 +555,9 @@ def refreshnet():
             for peer_key, peer_data in peers.items():
                 hostname = peer_data.get("HostName", "")
                 ips = peer_data.get("TailscaleIPs", [])
+                online = peer_data.get("Online", False)
                 if hostname and ips:
-                    DEVICES[hostname] = ips[0]
+                    DEVICES[hostname] = {"ip": ips[0], "online": online}
             
             self_node = JSON.get("Self")
             if self_node:
@@ -614,7 +615,7 @@ def refreshnet():
             if info and str(info.get('row', '0')) != '0':
                 widget.destroy()
 
-        if system == 'Darwin':
+            #### SINCE BACKEND WORKS NOW; CODE IS NOW SHARED FOR ALL OS SYSTEM
             USERrow = 1
             for user, data in DEVICES.items():
                 if user in SELF:
@@ -636,42 +637,18 @@ def refreshnet():
                     IPDEVICElabel = tk.Label(serverframe, text=str(ip), font=("Arial", 12))
                     IPDEVICElabel.grid(column=3, row=USERrow, sticky="w")
                     USERrow += 1
-        ### WINDOWS: device/IP only (no online status yet)
-        elif system == 'Windows':
-            USERrow = 1
-            for user, ip in DEVICES.items():
-                if user in SELF:
-                    pass
-                else:
-                    DEVICElabel = tk.Label(serverframe, text=str(user), font=("Arial", 12))
-                    DEVICElabel.grid(column=1, row=USERrow, sticky="w")
-
-                    IPDEVICElabel = tk.Label(serverframe, text=str(ip), font=("Arial", 12))
-                    IPDEVICElabel.grid(column=2, row=USERrow, sticky="w")
-                    USERrow += 1
-        ### LINUX: ORIGINAL device/IP-only code (UNTOUCHED)
-        else: 
-            USERrow = 1
-            for user, data in DEVICES.items():
-                if user in SELF:
-                    pass
-                else:
-                    online = data.get('online', False)
-                    if online == False:
-                        status = 'Offline'
-                    else:
-                        status = 'Online'
-                    ip = data.get('ip', '')
-
-                    STATUSlabel = tk.Label(serverframe, text=str(status), font=("Arial", 12))
-                    STATUSlabel.grid(column=1, row=USERrow, sticky="w")
-
-                    DEVICElabel = tk.Label(serverframe, text=str(user), font=("Arial", 12))
-                    DEVICElabel.grid(column=2, row=USERrow, sticky="w")
-
-                    IPDEVICElabel = tk.Label(serverframe, text=str(ip), font=("Arial", 12))
-                    IPDEVICElabel.grid(column=3, row=USERrow, sticky="w")
-                    USERrow += 1
+              
+            #### INCASE THE SYSTEM DOESN'T WORK, THIS IS THE BACK UP, OLD CODE.
+            # USERrow = 1
+            # for user, ip in DEVICES.items():
+            #     if user in SELF:
+            #         pass
+            #     else:
+            #         DEVICElabel = tk.Label(serverframe, text=str(user), font=("Arial", 12))
+            #         DEVICElabel.grid(column=1, row=USERrow, sticky="w")
+            #         IPDEVICElabel = tk.Label(serverframe, text=str(ip), font=("Arial", 12))
+            #         IPDEVICElabel.grid(column=2, row=USERrow, sticky="w")
+            #         USERrow += 1
                 
     except Exception as e:
         print("Error:", e)
@@ -913,6 +890,8 @@ def sendMessage():
 # Image loading
 bgimglink = 'https://raw.githubusercontent.com/sevdentries/tunnelnet/refs/heads/main/Assets/computerBackground.png'
 logoimglink = 'https://raw.githubusercontent.com/sevdentries/tunnelnet/refs/heads/main/Assets/tunnel.png'
+sendimglink = 'https://raw.githubusercontent.com/sevdentries/tunnelnet/refs/heads/main-frontend/Assets/icons8-send-96.png'
+
 try:
     with urlopen(bgimglink) as img1:
         bgimgraw = img1.read()
@@ -929,10 +908,21 @@ except:
     logoimgraw = str(userdir.parent)+"/Assets/silly.png"
     logoimgdata = tk.PhotoImage(file=logoimgraw)
 
+try:
+    with urlopen(sendimglink) as img3:
+        sendimgraw = img3.read()
+    sendimgdata = tk.PhotoImage(data = sendimgraw)
+except:
+    sendimgraw = str(userdir.parent) + '/Assets/silly.png'
+    sendimgdata = tk.PhotoImage(file = sendimgraw)
+
 # Images variables
 bgimg = bgimgdata.subsample(1,5)
 
 logoimg = logoimgdata.subsample(5,5)
+
+sendimg = sendimgdata.subsample(2,4)
+
 
 # Background Image
 bgimglabel = tk.Label(main, image=bgimg, bg='lightgray', border=0)
@@ -972,8 +962,11 @@ serverframe.grid_rowconfigure(0, weight=1)
 for i in range(100):
     serverframe.grid_rowconfigure(i+1, weight=2)
 
-usertitlelabel = tk.Label(serverframe, text='Users Online', font=200)
+usertitlelabel = tk.Label(serverframe, text='Users Found', font=200)
 usertitlelabel.grid(column=0, row=0, columnspan=2, sticky=NW, padx=20, pady=20)
+
+refreshbtn = tk.Button(serverframe, text='Refresh', command=refreshnet)
+refreshbtn.grid(column=3, row=0, sticky=W, padx=20, pady=20)
 
 # Chat frame (all of right) 
 mainchatframe = tk.Frame(main, bg=CHATBG)
@@ -1039,7 +1032,7 @@ inputframe.grid(column=0, row=1, columnspan=2, sticky='nsew')
 textbox = tk.Entry(inputframe, bg=TEXTBG, insertbackground='white', selectbackground='white', fg='white')
 textbox.grid(column=0, row=0, sticky='ew', padx=5, pady=10)
 textbox.bind("<Return>", lambda event:sendMessage()) # allows pressing enter to chat
-sendbtn = tk.Button(inputframe, text='Send', bg=TEXTBG, fg=TEXTBG, command=sendMessage)
+sendbtn = tk.Button(inputframe, image=sendimg, text='Send', bg=TEXTBG, fg=TEXTBG, command=sendMessage, width = 50, height = 15)
 sendbtn.grid(column=1, row=0, sticky='ew', pady=10, padx=(0,5))
 
 # Other Functions

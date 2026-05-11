@@ -337,6 +337,7 @@ def login(): #login command.
             print("login successful")
             root.withdraw()
             main.deiconify()
+            
             refreshnet()
         logassemble = f"tailscale up --auth-key={AUTH}"
         cmd_queue.put(logassemble)
@@ -350,10 +351,12 @@ def join():
     global AUTH, ISHOST, ISLOG
     AUTH = joinentry.get()
     cmd_queue.put(f"tailscale up --auth-key={AUTH}")
+    cmd_queue.join()
     ISHOST = False
     ISLOG = True
     root.withdraw()
     main.deiconify()
+    
 
 
 def sudofetch(): 
@@ -574,19 +577,27 @@ def refreshnet():
                 cmd_queue.put("tailscale status --json")
                 cmd_queue.join()
             TAILNAME = (JSON["CurrentTailnet"])["Name"]
-
+            peers = JSON.get("Peer") or {}
+            for peer_key, peer_data in peers.items():
+                hostname = peer_data.get("HostName", "")
+                ips = peer_data.get("TailscaleIPs", [])
+                online = peer_data.get("Online", False)
+                if hostname and ips:
+                    DEVICES[hostname] = {"ip": ips[0], "online": online}
             ##COMMAND SPECIFIC
 
             #cmd_queue.put("tailscale status --json | jq -r \'.Peer[] | \"\\(.HostName) \\(.TailscaleIPs[0])\"\'")
             #cmd_queue.put("tailscale status --json | jq -r \'.Peer[] | \"\\(.HostName)\"\'")
             #hostname and ip #tailscale status --json | jq -r '.Peer[] | "\(.HostName) \(.TailscaleIPs[0])"'
             #hostnames only #tailscale status --json | jq -r '.Peer[] | "\(.HostName)"' 
-
+            '''
             cmd_queue.put("tailscale status --json | jq -r '[.Peer[] | {key: .HostName, value: .TailscaleIPs[0]}] | from_entries | @json'")
             cmd_queue.join()
-
             STDOUT = STDOUT[:STDOUT.rfind("}")+1]
             DEVICES = ast.literal_eval(STDOUT)
+            '''
+
+            
 
             print(len(DEVICES))
     
@@ -641,15 +652,25 @@ def refreshnet():
         ### LINUX: ORIGINAL device/IP-only code (UNTOUCHED)
         else: 
             USERrow = 1
-            for user, ip in DEVICES.items():
+            for user, data in DEVICES.items():
                 if user in SELF:
                     pass
                 else:
+                    online = data.get('online', False)
+                    if online == False:
+                        status = 'Offline'
+                    else:
+                        status = 'Online'
+                    ip = data.get('ip', '')
+
+                    STATUSlabel = tk.Label(serverframe, text=str(status), font=("Arial", 12))
+                    STATUSlabel.grid(column=1, row=USERrow, sticky="w")
+
                     DEVICElabel = tk.Label(serverframe, text=str(user), font=("Arial", 12))
-                    DEVICElabel.grid(column=1, row=USERrow, sticky="w")
+                    DEVICElabel.grid(column=2, row=USERrow, sticky="w")
 
                     IPDEVICElabel = tk.Label(serverframe, text=str(ip), font=("Arial", 12))
-                    IPDEVICElabel.grid(column=2, row=USERrow, sticky="w")
+                    IPDEVICElabel.grid(column=3, row=USERrow, sticky="w")
                     USERrow += 1
                 
     except Exception as e:
@@ -931,7 +952,7 @@ profileframe.grid_rowconfigure(3, weight=1)
 logoimglabel = tk.Label(profileframe, image=logoimg, border=0)
 logoimglabel.grid(column=0, row=0, padx=20, pady=20, rowspan=3)
 
-namelabel = tk.Label(profileframe, text="Tunnelnet", font=("Arial", 20))
+namelabel = tk.Label(profileframe, text="tunnelNET", font=("Arial", 20))
 namelabel.grid(column=1, row=0)
 
 userlabel = tk.Label(profileframe, text=f"Welcome, {selfname}", font=("Arial", 10))
@@ -968,14 +989,22 @@ chattab = ttk.Notebook(mainchatframe)
 chattabcount = 3
 chatframes = []
 
-chatframe1 = tk.Frame(chattab)
+homeframe = tk.Frame(chattab)
 #chatframe2 = tk.Frame(chattab)
 #chatframe3 = tk.Frame(chattab)
-chattab.add(chatframe1, text="Home")
+chattab.add(homeframe, text="Home")
 #chattab.add(chatframe2, text="F2")
 #chattab.add(chatframe3, text="F3")
+chatframes.extend([homeframe])
 
-chatframes.extend([chatframe1])
+for a in range(3):
+    homeframe.rowconfigure(a, weight=1)
+    homeframe.columnconfigure(a, weight=1)
+
+hometitle = Label(homeframe, text="Please select a device to connect to...")
+
+
+
 #chatframes.extend([chatframe1, chatframe2, chatframe3]) #Puts chatframe1-3 into chatframes list
 chattab.grid(column=0, row=0, columnspan=2, sticky='nsew', padx=20, pady=20)
 
@@ -1037,6 +1066,7 @@ joinbutton = Button(jointab, text="Connect", command=join)
 def softlogfunc():
     root.withdraw()
     main.deiconify()
+    
     refreshnet()
 
 softlogtab = Frame(initialize)

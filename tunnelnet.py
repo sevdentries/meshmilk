@@ -552,6 +552,7 @@ def refreshnet():
             for peer_key, peer_data in peers.items():
                 hostname = peer_data.get("HostName", "")
                 ips = peer_data.get("TailscaleIPs", [])
+                online = peer_data.get("Online", False)
                 if hostname and ips:
                     DEVICES[hostname] = {"ip": ips[0], "online": online}
             

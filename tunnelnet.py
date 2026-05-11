@@ -959,8 +959,11 @@ serverframe.grid_rowconfigure(0, weight=1)
 for i in range(100):
     serverframe.grid_rowconfigure(i+1, weight=2)
 
-usertitlelabel = tk.Label(serverframe, text='Users Online', font=200)
+usertitlelabel = tk.Label(serverframe, text='Users Found', font=200)
 usertitlelabel.grid(column=0, row=0, columnspan=2, sticky=NW, padx=20, pady=20)
+
+refreshbtn = tk.Button(serverframe, text='Refresh', command=refreshnet)
+refreshbtn.grid(column=3, row=0, sticky=W, padx=20, pady=20)
 
 # Chat frame (all of right) 
 mainchatframe = tk.Frame(main, bg=CHATBG)

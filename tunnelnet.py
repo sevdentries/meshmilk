@@ -603,7 +603,7 @@ def refreshnet():
             if info and str(info.get('row', '0')) != '0':
                 widget.destroy()
 
-        if system == 'Darwin':
+            #### SINCE BACKEND WORKS NOW; CODE IS NOW SHARED FOR ALL OS SYSTEM
             USERrow = 1
             for user, data in DEVICES.items():
                 if user in SELF:
@@ -625,32 +625,19 @@ def refreshnet():
                     IPDEVICElabel = tk.Label(serverframe, text=str(ip), font=("Arial", 12))
                     IPDEVICElabel.grid(column=3, row=USERrow, sticky="w")
                     USERrow += 1
-        ### WINDOWS: device/IP only (no online status yet)
-        elif system == 'Windows':
-            USERrow = 1
-            for user, ip in DEVICES.items():
-                if user in SELF:
-                    pass
-                else:
-                    DEVICElabel = tk.Label(serverframe, text=str(user), font=("Arial", 12))
-                    DEVICElabel.grid(column=1, row=USERrow, sticky="w")
+              
+            #### INCASE THE SYSTEM DOESN'T WORK, THIS IS THE BACK UP, OLD CODE.
+            # USERrow = 1
+            # for user, ip in DEVICES.items():
+            #     if user in SELF:
+            #         pass
+            #     else:
+            #         DEVICElabel = tk.Label(serverframe, text=str(user), font=("Arial", 12))
+            #         DEVICElabel.grid(column=1, row=USERrow, sticky="w")
 
-                    IPDEVICElabel = tk.Label(serverframe, text=str(ip), font=("Arial", 12))
-                    IPDEVICElabel.grid(column=2, row=USERrow, sticky="w")
-                    USERrow += 1
-        ### LINUX: ORIGINAL device/IP-only code (UNTOUCHED)
-        else: 
-            USERrow = 1
-            for user, ip in DEVICES.items():
-                if user in SELF:
-                    pass
-                else:
-                    DEVICElabel = tk.Label(serverframe, text=str(user), font=("Arial", 12))
-                    DEVICElabel.grid(column=1, row=USERrow, sticky="w")
-
-                    IPDEVICElabel = tk.Label(serverframe, text=str(ip), font=("Arial", 12))
-                    IPDEVICElabel.grid(column=2, row=USERrow, sticky="w")
-                    USERrow += 1
+            #         IPDEVICElabel = tk.Label(serverframe, text=str(ip), font=("Arial", 12))
+            #         IPDEVICElabel.grid(column=2, row=USERrow, sticky="w")
+            #         USERrow += 1
                 
     except Exception as e:
         print("Error:", e)

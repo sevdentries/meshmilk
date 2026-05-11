@@ -587,25 +587,7 @@ def refreshnet():
 
             STDOUT = STDOUT[:STDOUT.rfind("}")+1]
             DEVICES = ast.literal_eval(STDOUT)
-            """
-            for char in "\r\n":
-                STDOUT = STDOUT.replace(char, " ")
-            
-            assembly = STDOUT.split()
-            
-            toggle = 1
-            obj1 = ""
-            obj2 = ""
 
-            for object in assembly:
-                if toggle == 1:
-                    toggle = 2
-                    obj1 = object
-                elif toggle == 2:
-                    toggle = 1
-                    obj2 = object
-                    DEVICES[obj1] = obj2
-            """
             print(len(DEVICES))
     
         # Device name and IP update

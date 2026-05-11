@@ -2,6 +2,7 @@ import platform
 import sys
 import os
 import subprocess
+import ast
 
 # On macOS, the system Python (3.9) ships with Tk 8.5 which doesn't support
 # macOS 13+ version numbering and will abort on launch. Require Tk 8.6+.
@@ -458,6 +459,7 @@ def bash_worker():
                 inject.sendline(cmd)
                 inject.expect([r"# ", r"\$ "], timeout=5)
                 
+                print(STDOUT)
                 STDOUT = inject.before.split("\r\n", 1)[-1]
                 STDOUT = ansi_escape.sub('', STDOUT).strip()
                 if JSONFLAG == True:
@@ -575,14 +577,22 @@ def refreshnet():
 
             ##COMMAND SPECIFIC
 
-            cmd_queue.put("tailscale status --json | jq -r \'.Peer[] | \"\\(.HostName) \\(.TailscaleIPs[0])\"\'")
+            #cmd_queue.put("tailscale status --json | jq -r \'.Peer[] | \"\\(.HostName) \\(.TailscaleIPs[0])\"\'")
+            #cmd_queue.put("tailscale status --json | jq -r \'.Peer[] | \"\\(.HostName)\"\'")
+            #hostname and ip #tailscale status --json | jq -r '.Peer[] | "\(.HostName) \(.TailscaleIPs[0])"'
+            #hostnames only #tailscale status --json | jq -r '.Peer[] | "\(.HostName)"' 
+
+            cmd_queue.put("tailscale status --json | jq -r '[.Peer[] | {key: .HostName, value: .TailscaleIPs[0]}] | from_entries | @json'")
             cmd_queue.join()
 
-            STDOUT = STDOUT[:STDOUT.rfind("\r\n")]
-
+            STDOUT = STDOUT[:STDOUT.rfind("}")+1]
+            DEVICES = ast.literal_eval(STDOUT)
+            """
             for char in "\r\n":
                 STDOUT = STDOUT.replace(char, " ")
+            
             assembly = STDOUT.split()
+            
             toggle = 1
             obj1 = ""
             obj2 = ""
@@ -595,14 +605,14 @@ def refreshnet():
                     toggle = 1
                     obj2 = object
                     DEVICES[obj1] = obj2
+            """
             print(len(DEVICES))
     
         # Device name and IP update
-        for user, ip in SELF.items():
-            selfname = str(user)
-            selfip = str(ip)
-            userlabel.config(text=f"Welcome, {selfname}")
-            IPlabel.config(text=f"Logged in from IP {selfip}")
+        selfname = (JSON["Self"])["HostName"]
+        selfip = ((JSON["Self"])["TailscaleIPs"])[0]
+        userlabel.config(text=f"Welcome, {selfname}")
+        IPlabel.config(text=f"Logged in from IP {selfip}")
 
         ####### ONLINE STATUS CHECK CURRENTLY ONLY WORKS ON MAC; NEED BACKEND SUPPORT DONE BEFORE INTEGRATING TO WINDOWS/LINUX
         # Clear existing user rows in serverframe (keep row 0 which is usertitlelabel)
@@ -977,18 +987,19 @@ chattabcount = 3
 chatframes = []
 
 chatframe1 = tk.Frame(chattab)
-chatframe2 = tk.Frame(chattab)
-chatframe3 = tk.Frame(chattab)
-chattab.add(chatframe1, text="F1")
-chattab.add(chatframe2, text="F2")
-chattab.add(chatframe3, text="F3")
+#chatframe2 = tk.Frame(chattab)
+#chatframe3 = tk.Frame(chattab)
+chattab.add(chatframe1, text="Home")
+#chattab.add(chatframe2, text="F2")
+#chattab.add(chatframe3, text="F3")
 
-chatframes.extend([chatframe1, chatframe2, chatframe3]) #Puts chatframe1-3 into chatframes list
+chatframes.extend([chatframe1])
+#chatframes.extend([chatframe1, chatframe2, chatframe3]) #Puts chatframe1-3 into chatframes list
 chattab.grid(column=0, row=0, columnspan=2, sticky='nsew', padx=20, pady=20)
 
 for frames in (chatframes):
     frames.grid_columnconfigure(0, weight = 1)
-
+'''
 def addchattab():
     global chattabcount
     if chattabcount < 20:
@@ -1004,6 +1015,7 @@ def addchattab():
 addtabbtn = tk.Button(chattab, text='Add Chat', bg=SELECTBG, fg='white', activebackground=BANNERBG, activeforeground='black', relief='flat', width=2)
 addtabbtn.config(command = addchattab)
 addtabbtn.pack(side=LEFT, anchor=NW)
+'''
 
 # Input frame (bottom-right) 
 inputframe = tk.Frame(mainchatframe, bg=TEXTBG)

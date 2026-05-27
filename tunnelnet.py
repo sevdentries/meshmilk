@@ -168,6 +168,7 @@ chat_logs = {}
 #updated information (stuff that needs to be refreshed)
 SELF = {}
 DEVICES = {}
+CLIENTCHATS = 0
 #tunnelnet should only save the clientID. APIKEY cannot be saved and 
 #must be requested at user login.
 #physical control of local API can be done using cli, my idea is to run
@@ -487,7 +488,7 @@ def refreshnet():
     '''
     function for refreshing all information relating to a user's tailnet (devices, ips, etc)
     '''
-    global JSONFLAG, SELF, JSON, TAILNET, STDOUT, TAILNAME, DEVICES
+    global JSONFLAG, SELF, JSON, TAILNET, STDOUT, TAILNAME, DEVICES,selfname,selfip
     try:
         JSONFLAG = True
         cmd_queue.put("tailscale status --json")
@@ -741,6 +742,7 @@ def messaging_service():
     Cross-platform TCP messaging service.
     Handles sending, receiving, and acknowledging messages over MESG_PORT.
     Both sender and receiver store chat logs and confirm delivery via ACK.
+    send_packet("ip", "MESSAGE)
     """
     def handle_connection(conn, addr):
         """Handle a single incoming TCP connection in its own thread."""
@@ -849,15 +851,44 @@ def selectorfunc(number):
     '''
     selector function for device list in home. insert numbers 0 or 1 for homelist or homeiplist respectively.
     '''
+
+    '''
+    def addchattab():
+        global chattabcount
+        if chattabcount < 20:
+            chattabcount += 1
+            newframe = tk.Frame(chattab)
+            newframe.grid_columnconfigure(0, weight = 1)
+            chattab.add(newframe, text=f"F{chattabcount}")
+            chatframes.append(newframe)
+            chattab.select(newframe)
+        else:
+            pass
+
+    addtabbtn = tk.Button(chattab, text='Add Chat', bg=SELECTBG, fg='white', activebackground=BANNERBG, activeforeground='black', relief='flat', width=2)
+    addtabbtn.config(command = addchattab)
+    addtabbtn.pack(side=LEFT, anchor=NW)
+    '''
+    global CLIENTCHATS, SELF
     if number == 0:
+        CLIENTCHATS += 1
         compsel = homelist.curselection()
         select = compsel[0]
         select = homeiplist.get(compsel[0])
-        print(select)
-    elif number == 1:
-        compsel = homeiplist.curselection()
-        select = homeiplist.get(compsel[0])
+        send_packet(select, f"hello from {select}!")
+        select = homelist.get(compsel[0])
+        nframe = Frame(chattab)
+        for i in range(3):
+            nframe.columnconfigure(i, weight=1)
+            nframe.rowconfigure(i, weight=1)
+        chattab.add(nframe, text=f"{select}")
+        chatframes.append(nframe)
+        chattab.select(nframe)
 
+def refreshchat():
+    global chat_logs
+    for devices in chat_logs():
+        pass
 
 msg_thread = threading.Thread(target=messaging_service, daemon=True)
 msg_thread.start()
@@ -1029,7 +1060,7 @@ homeiplist.grid(row=1,column=1, sticky=NSEW)
 homebar.grid(row=1, column=2, sticky=NSEW)
 
 homelist.bind("<Double-Button-1>", lambda event:selectorfunc(0))
-homeiplist.bind("<Double-Button-1>", lambda event:selectorfunc(1))
+
 #CONTINUE HERE ALTON ########################################################################################
 
 #chatframes.extend([chatframe1, chatframe2, chatframe3]) #Puts chatframe1-3 into chatframes list

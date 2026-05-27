@@ -624,12 +624,19 @@ def refreshnet():
                     online = data.get('online', False)
                     if online == False:
                         status = 'Offline'
+                        STATUSlabel = tk.Label(serverframe, text=str(status), font=("Arial", 12), fg = 'white', bg = SERVERBG)
+                        Statuslabeliconoffline = tk.Label(serverframe, image = offlineimg, border = 0, fg = 'white', bg = SERVERBG)
+                        STATUSlabel.grid(column=1, row=USERrow, sticky="w")
+                        Statuslabeliconoffline.grid(column = 0, row = USERrow, sticky = 'e', padx = 20)
                     else:
                         status = 'Online'
+                        STATUSlabel = tk.Label(serverframe, text=str(status), font=("Arial", 12), fg = 'white', bg = SERVERBG)
+                        Statuslabeliconoffline = tk.Label(serverframe, image = onlineimg, border = 0, fg = 'white', bg = SERVERBG)
+                        STATUSlabel.grid(column=1, row=USERrow, sticky="w")
+                        Statuslabeliconoffline.grid(column = 0, row = USERrow, sticky = 'e', padx = 20)
                     ip = str(data['ip'])
 
-                    STATUSlabel = tk.Label(serverframe, text=str(status), font=("Arial", 12))
-                    STATUSlabel.grid(column=1, row=USERrow, sticky="w")
+
 
                     DEVICElabel = tk.Label(serverframe, text=str(user), font=("Arial", 12))
                     DEVICElabel.grid(column=2, row=USERrow, sticky="w")
@@ -913,8 +920,9 @@ def sendMessage():
 # Image loading
 bgimglink = 'https://raw.githubusercontent.com/sevdentries/tunnelnet/refs/heads/main/Assets/computerBackground.png'
 logoimglink = 'https://raw.githubusercontent.com/sevdentries/tunnelnet/refs/heads/main/Assets/tunnel.png'
-sendimglink = 'https://raw.githubusercontent.com/sevdentries/tunnelnet/refs/heads/main-frontend/Assets/icons8-send-96.png'
-
+sendimglink = 'https://raw.githubusercontent.com/sevdentries/tunnelnet/refs/heads/jaydon-working-here/Assets/Sendbtn%20Icons.png'
+offlineimglink = 'https://raw.githubusercontent.com/sevdentries/tunnelnet/refs/heads/jaydon-working-here/Assets/Offline%20-%20tunnelnet.png'
+onlineimglink = 'https://raw.githubusercontent.com/sevdentries/tunnelnet/refs/heads/jaydon-working-here/Assets/Online%20-%20tunnelnet.png'
 try:
     with urlopen(bgimglink) as img1:
         bgimgraw = img1.read()
@@ -939,10 +947,29 @@ except:
     sendimgraw = str(userdir.parent) + '/Assets/silly.png'
     sendimgdata = tk.PhotoImage(file = sendimgraw)
 
+try:
+    with urlopen(offlineimglink) as img4:
+        offlineimgraw = img4.read()
+    offlineimgdata = tk.PhotoImage(data = offlineimgraw)
+except:
+    offlineimgraw = str(userdir.parent) + '/Assets/silly.png'
+    offlineimgdata = tk.PhotoImage(file = offlineimgraw)
+
+try:
+    with urlopen(onlineimglink) as img5:
+        onlineimgraw = img5.read()
+    onlineimgdata = tk.PhotoImage(data = onlineimgraw)
+except:
+    onlineimgraw = str(userdir.parent) + '/Assets/silly.png'
+    onlineimgdata = tk.PhotoImage(file = onlineimgraw)
+
+
 # Images variables
 bgimg = bgimgdata.subsample(1,5)
 logoimg = logoimgdata.subsample(5,5)
 sendimg = sendimgdata.subsample(2,4)
+onlineimg = onlineimgdata.subsample(1, 1)
+offlineimg = offlineimgdata.subsample(1, 1)
 
 # Background Image
 bgimglabel = tk.Label(main, image=bgimg, bg='lightgray', border=0)

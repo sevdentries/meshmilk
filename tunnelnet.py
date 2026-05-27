@@ -609,6 +609,7 @@ def refreshnet():
         IPlabel.config(text=f"Logged in from IP {selfip}")
 
         # Clear existing user rows in serverframe (keep row 0 which is usertitlelabel)
+        barflag = False
         for widget in serverframe.winfo_children():
             info = widget.grid_info()
             if info and str(info.get('row', '0')) != '0':
@@ -625,7 +626,7 @@ def refreshnet():
                         status = 'Offline'
                     else:
                         status = 'Online'
-                    ip = data.get('ip', '')
+                    ip = str(data['ip'])
 
                     STATUSlabel = tk.Label(serverframe, text=str(status), font=("Arial", 12))
                     STATUSlabel.grid(column=1, row=USERrow, sticky="w")
@@ -636,6 +637,15 @@ def refreshnet():
                     IPDEVICElabel = tk.Label(serverframe, text=str(ip), font=("Arial", 12))
                     IPDEVICElabel.grid(column=3, row=USERrow, sticky="w")
                     USERrow += 1
+                    if not homelist.index('end') == len(DEVICES):
+                        if not barflag:
+                            homelist.delete(0,END)
+                            homeiplist.delete(0,END)
+                            barflag = True
+                        homelist.insert(END, str(user))
+                        homeiplist.insert(END, str(ip))
+
+            
               
             #### INCASE THE SYSTEM DOESN'T WORK, THIS IS THE BACK UP, OLD CODE.
             # USERrow = 1
@@ -835,6 +845,20 @@ def messaging_service():
         finally:
             msg_queue.task_done()
 
+def selectorfunc(number):
+    '''
+    selector function for device list in home. insert numbers 0 or 1 for homelist or homeiplist respectively.
+    '''
+    if number == 0:
+        compsel = homelist.curselection()
+        select = compsel[0]
+        select = homeiplist.get(compsel[0])
+        print(select)
+    elif number == 1:
+        compsel = homeiplist.curselection()
+        select = homeiplist.get(compsel[0])
+
+
 msg_thread = threading.Thread(target=messaging_service, daemon=True)
 msg_thread.start()
 
@@ -990,11 +1014,22 @@ chattab.add(homeframe, text="Home")
 chatframes.extend([homeframe])
 
 for a in range(3):
-    homeframe.rowconfigure(a, weight=1)
-    homeframe.columnconfigure(a, weight=1)
+    homeframe.rowconfigure(a, weight=0)
+    homeframe.columnconfigure(a, weight=0)
 
-hometitle = Label(homeframe, text="Please select a device to connect to...")
+hometitle = Label(homeframe, text="Please select a device to connect to...", justify='left')
+homebar = Scrollbar(homeframe)
+homelist = Listbox(homeframe, yscrollcommand=homebar.set)
+homeiplist = Listbox(homeframe, yscrollcommand=homebar.set)
+homebar.config(command=homelist.yview and homeiplist.yview)
 
+hometitle.grid(row=0,column=0, sticky=SW)
+homelist.grid(row=1,column=0, sticky=NSEW)
+homeiplist.grid(row=1,column=1, sticky=NSEW)
+homebar.grid(row=1, column=2, sticky=NSEW)
+
+homelist.bind("<Double-Button-1>", lambda event:selectorfunc(0))
+homeiplist.bind("<Double-Button-1>", lambda event:selectorfunc(1))
 #CONTINUE HERE ALTON ########################################################################################
 
 #chatframes.extend([chatframe1, chatframe2, chatframe3]) #Puts chatframe1-3 into chatframes list

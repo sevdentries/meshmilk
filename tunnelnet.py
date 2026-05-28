@@ -925,51 +925,45 @@ offlineimglink = 'https://raw.githubusercontent.com/sevdentries/tunnelnet/refs/h
 onlineimglink = 'https://raw.githubusercontent.com/sevdentries/tunnelnet/refs/heads/jaydon-working-here/Assets/Online%20-%20tunnelnet.png'
 refreshimglink = 'https://raw.githubusercontent.com/sevdentries/tunnelnet/refs/heads/jaydon-working-here/Assets/refresh.png'
 try:
-    with urlopen(bgimglink) as img1:
-        bgimgraw = img1.read()
-    bgimgdata = tk.PhotoImage(data=bgimgraw)
+    bgimgraw = str(userdir.parent)+"/Assets/computerBackground.png"
+    bgimgdata = tk.PhotoImage(file=bgimgraw)
 except:
     bgimgraw = str(userdir.parent)+"/Assets/silly.png"
     bgimgdata = tk.PhotoImage(file=bgimgraw)
 
 try:
-    with urlopen(logoimglink) as img2:
-        logoimgraw = img2.read()
-    logoimgdata = tk.PhotoImage(data=logoimgraw)
+    logoimgraw = str(userdir.parent)+"/Assets/tunnelnetlogo.png"
+    logoimgdata = tk.PhotoImage(file=logoimgraw)
 except:
     logoimgraw = str(userdir.parent)+"/Assets/silly.png"
     logoimgdata = tk.PhotoImage(file=logoimgraw)
 
 try:
-    with urlopen(sendimglink) as img3:
-        sendimgraw = img3.read()
-    sendimgdata = tk.PhotoImage(data = sendimgraw)
+    sendimgraw = str(userdir.parent)+"/Assets/sendbutton.png"
+    sendimgdata = tk.PhotoImage(file = sendimgraw)
 except:
     sendimgraw = str(userdir.parent) + '/Assets/silly.png'
     sendimgdata = tk.PhotoImage(file = sendimgraw)
 
 try:
-    with urlopen(offlineimglink) as img4:
-        offlineimgraw = img4.read()
-    offlineimgdata = tk.PhotoImage(data = offlineimgraw)
+    offlineimgraw = str(userdir.parent)+"/Assets/offlineCircle.png"
+    offlineimgdata = tk.PhotoImage(file = offlineimgraw)
 except:
     offlineimgraw = str(userdir.parent) + '/Assets/silly.png'
     offlineimgdata = tk.PhotoImage(file = offlineimgraw)
 
 try:
-    with urlopen(onlineimglink) as img5:
-        onlineimgraw = img5.read()
-    onlineimgdata = tk.PhotoImage(data = onlineimgraw)
+    onlineimgraw = str(userdir.parent)+"/Assets/onlineCircle.png"
+    onlineimgdata = tk.PhotoImage(file = onlineimgraw)
 except:
     onlineimgraw = str(userdir.parent) + '/Assets/silly.png'
     onlineimgdata = tk.PhotoImage(file = onlineimgraw)
 try:
-    with urlopen(refreshimglink) as img6:
-        refreshimgraw = img6.read()
-    refreshimgdata = tk.PhotoImage(data = refreshimgraw)
+    refreshimgraw = str(userdir.parent) + '/Assets/refresh.png'
+    refreshimgdata = tk.PhotoImage(file = refreshimgraw)
 except:
     refreshimgraw = str(userdir.parent) + '/Assets/silly.png'
-    refreshimgdata = tk.PhotoImage(file = onlineimgraw)
+    refreshimgdata = tk.PhotoImage(file = refreshimgraw)
 
 # Images variables
 bgimg = bgimgdata.subsample(1,5)

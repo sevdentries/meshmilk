@@ -923,6 +923,7 @@ logoimglink = 'https://raw.githubusercontent.com/sevdentries/tunnelnet/refs/head
 sendimglink = 'https://raw.githubusercontent.com/sevdentries/tunnelnet/refs/heads/jaydon-working-here/Assets/Sendbtn%20Icons.png'
 offlineimglink = 'https://raw.githubusercontent.com/sevdentries/tunnelnet/refs/heads/jaydon-working-here/Assets/Offline%20-%20tunnelnet.png'
 onlineimglink = 'https://raw.githubusercontent.com/sevdentries/tunnelnet/refs/heads/jaydon-working-here/Assets/Online%20-%20tunnelnet.png'
+refreshimglink = 'https://raw.githubusercontent.com/sevdentries/tunnelnet/refs/heads/jaydon-working-here/Assets/refresh.png'
 try:
     with urlopen(bgimglink) as img1:
         bgimgraw = img1.read()
@@ -962,7 +963,13 @@ try:
 except:
     onlineimgraw = str(userdir.parent) + '/Assets/silly.png'
     onlineimgdata = tk.PhotoImage(file = onlineimgraw)
-
+try:
+    with urlopen(refreshimglink) as img6:
+        refreshimgraw = img6.read()
+    refreshimgdata = tk.PhotoImage(data = refreshimgraw)
+except:
+    refreshimgraw = str(userdir.parent) + '/Assets/silly.png'
+    refreshimgdata = tk.PhotoImage(file = onlineimgraw)
 
 # Images variables
 bgimg = bgimgdata.subsample(1,5)
@@ -970,6 +977,7 @@ logoimg = logoimgdata.subsample(5,5)
 sendimg = sendimgdata.subsample(2,4)
 onlineimg = onlineimgdata.subsample(1, 1)
 offlineimg = offlineimgdata.subsample(1, 1)
+refreshimg = refreshimgdata.subsample(2,2)
 
 # Background Image
 bgimglabel = tk.Label(main, image=bgimg, bg='lightgray', border=0)
@@ -1015,7 +1023,7 @@ usertitlelabel.grid(column=0, row=0, columnspan=2, sticky=NW, padx=20, pady=20)
 def refresh():
     refreshnet()
 
-refreshbtn = tk.Button(serverframe, text='Refresh', command=refresh)
+refreshbtn = tk.Button(serverframe, image = refreshimg, command=refresh)
 refreshbtn.grid(column=3, row=0, sticky=W, padx=20, pady=20)
 
 # Chat frame (all of right) 

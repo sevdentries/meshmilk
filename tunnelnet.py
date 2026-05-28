@@ -614,7 +614,7 @@ def refreshnet():
         # Device name and IP update
         selfname = (JSON["Self"])["HostName"]
         selfip = ((JSON["Self"])["TailscaleIPs"])[0]
-        userlabel.config(text=f"Welcome, {selfname}")
+        userlabel.config(text=f"Welcome, {selfname}", fg = 'white', bg = PROFILEBG)
         IPlabel.config(text=f"Logged in from IP {selfip}")
 
         #clear rows before you refresh lol (but save row 0 because its a title label)
@@ -633,17 +633,24 @@ def refreshnet():
                     online = data.get('online', False)
                     if online == False:
                         status = 'Offline'
+                        STATUSlabel = tk.Label(serverframe, text=str(status), font=("Arial", 12), fg = 'white', bg = SERVERBG)
+                        Statuslabeliconoffline = tk.Label(serverframe, image = offlineimg, border = 0, fg = 'white', bg = SERVERBG)
+                        STATUSlabel.grid(column=1, row=USERrow, sticky="w")
+                        Statuslabeliconoffline.grid(column = 0, row = USERrow, sticky = 'e', padx = 20)
                     else:
                         status = 'Online'
+                        STATUSlabel = tk.Label(serverframe, text=str(status), font=("Arial", 12), fg = 'white', bg = SERVERBG)
+                        Statuslabeliconoffline = tk.Label(serverframe, image = onlineimg, border = 0, fg = 'white', bg = SERVERBG)
+                        STATUSlabel.grid(column=1, row=USERrow, sticky="w")
+                        Statuslabeliconoffline.grid(column = 0, row = USERrow, sticky = 'e', padx = 20)
                     ip = str(data['ip'])
 
-                    STATUSlabel = tk.Label(serverframe, text=str(status), font=("Arial", 12))
-                    STATUSlabel.grid(column=1, row=USERrow, sticky="w")
 
-                    DEVICElabel = tk.Label(serverframe, text=str(user), font=("Arial", 12))
+
+                    DEVICElabel = tk.Label(serverframe, text=str(user), font=("Arial", 12), fg = 'white', bg = SERVERBG)
                     DEVICElabel.grid(column=2, row=USERrow, sticky="w")
 
-                    IPDEVICElabel = tk.Label(serverframe, text=str(ip), font=("Arial", 12))
+                    IPDEVICElabel = tk.Label(serverframe, text=str(ip), font=("Arial", 12), fg = 'white', bg = SERVERBG)
                     IPDEVICElabel.grid(column=3, row=USERrow, sticky="w")
                     USERrow += 1
                     if not homelist.index('end') == len(DEVICES):
@@ -1017,10 +1024,6 @@ def sendMessage():
         """
 
 # Image loading
-bgimglink = 'https://raw.githubusercontent.com/sevdentries/tunnelnet/refs/heads/main/Assets/computerBackground.png'
-logoimglink = 'https://raw.githubusercontent.com/sevdentries/tunnelnet/refs/heads/main/Assets/tunnel.png'
-sendimglink = 'https://raw.githubusercontent.com/sevdentries/tunnelnet/refs/heads/main-frontend/Assets/icons8-send-96.png'
-
 try:
     bgimgraw = str(userdir.parent)+"/Assets/computerBackground.png"
     bgimgdata = tk.PhotoImage(file=bgimgraw)
@@ -1044,10 +1047,33 @@ except Exception as e:
     sendimgdata = tk.PhotoImage(file = sendimgraw)
     print(e)
 
+try:
+    offlineimgraw = str(userdir.parent)+"/Assets/offlineCircle.png"
+    offlineimgdata = tk.PhotoImage(file = offlineimgraw)
+except:
+    offlineimgraw = str(userdir.parent) + '/Assets/silly.png'
+    offlineimgdata = tk.PhotoImage(file = offlineimgraw)
+
+try:
+    onlineimgraw = str(userdir.parent)+"/Assets/onlineCircle.png"
+    onlineimgdata = tk.PhotoImage(file = onlineimgraw)
+except:
+    onlineimgraw = str(userdir.parent) + '/Assets/silly.png'
+    onlineimgdata = tk.PhotoImage(file = onlineimgraw)
+try:
+    refreshimgraw = str(userdir.parent) + '/Assets/refresh.png'
+    refreshimgdata = tk.PhotoImage(file = refreshimgraw)
+except:
+    refreshimgraw = str(userdir.parent) + '/Assets/silly.png'
+    refreshimgdata = tk.PhotoImage(file = refreshimgraw)
+
 # Images variables
 bgimg = bgimgdata.subsample(1,5)
 logoimg = logoimgdata.subsample(5,5)
 sendimg = sendimgdata.subsample(2,4)
+onlineimg = onlineimgdata.subsample(1, 1)
+offlineimg = offlineimgdata.subsample(1, 1)
+refreshimg = refreshimgdata.subsample(2,2)
 
 # Background Image
 bgimglabel = tk.Label(main, image=bgimg, bg='lightgray', border=0)
@@ -1067,13 +1093,13 @@ profileframe.grid_rowconfigure(3, weight=1)
 logoimglabel = tk.Label(profileframe, image=logoimg, border=0)
 logoimglabel.grid(column=0, row=0, padx=20, pady=20, rowspan=3)
 
-namelabel = tk.Label(profileframe, text="tunnelNET", font=("Arial", 20))
+namelabel = tk.Label(profileframe, text="tunnelNET", font=("Arial", 20), fg = 'white', bg = PROFILEBG)
 namelabel.grid(column=1, row=0)
 
 userlabel = tk.Label(profileframe, text=f"Welcome, {selfname}", font=("Arial", 10))
 userlabel.grid(column=1, row=1)
 
-IPlabel = tk.Label(profileframe, text=f"Logged in from IP {selfip}", font=("Arial", 10))
+IPlabel = tk.Label(profileframe, text=f"Logged in from IP {selfip}", font=("Arial", 10), fg = 'white', bg = PROFILEBG)
 IPlabel.grid(column=1, row=2)
 
 # Server frame (users and other online people); part of Profileframe
@@ -1087,13 +1113,13 @@ serverframe.grid_rowconfigure(0, weight=1)
 for i in range(100):
     serverframe.grid_rowconfigure(i+1, weight=2)
 
-usertitlelabel = tk.Label(serverframe, text='Users Found', font=200)
+usertitlelabel = tk.Label(serverframe, text='Users Found', font=200, fg = 'white', bg = SERVERBG)
 usertitlelabel.grid(column=0, row=0, columnspan=2, sticky=NW, padx=20, pady=20)
 
 def refresh():
     refreshnet()
 
-refreshbtn = tk.Button(serverframe, text='Refresh', command=refresh)
+refreshbtn = tk.Button(serverframe, image = refreshimg, command=refresh)
 refreshbtn.grid(column=3, row=0, sticky=W, padx=20, pady=20)
 
 # Chat frame (all of right) 

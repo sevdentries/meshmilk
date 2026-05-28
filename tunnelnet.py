@@ -918,12 +918,6 @@ def sendMessage():
         textbox.delete(0, tk.END)
 
 # Image loading
-bgimglink = 'https://raw.githubusercontent.com/sevdentries/tunnelnet/refs/heads/main/Assets/computerBackground.png'
-logoimglink = 'https://raw.githubusercontent.com/sevdentries/tunnelnet/refs/heads/main/Assets/tunnel.png'
-sendimglink = 'https://raw.githubusercontent.com/sevdentries/tunnelnet/refs/heads/jaydon-working-here/Assets/Sendbtn%20Icons.png'
-offlineimglink = 'https://raw.githubusercontent.com/sevdentries/tunnelnet/refs/heads/jaydon-working-here/Assets/Offline%20-%20tunnelnet.png'
-onlineimglink = 'https://raw.githubusercontent.com/sevdentries/tunnelnet/refs/heads/jaydon-working-here/Assets/Online%20-%20tunnelnet.png'
-refreshimglink = 'https://raw.githubusercontent.com/sevdentries/tunnelnet/refs/heads/jaydon-working-here/Assets/refresh.png'
 try:
     bgimgraw = str(userdir.parent)+"/Assets/computerBackground.png"
     bgimgdata = tk.PhotoImage(file=bgimgraw)

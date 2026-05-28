@@ -53,7 +53,7 @@ elif system == "Darwin":
 
     # Ensure 'requests' and 'pexpect' are installed for the current Python
     try:
-        ensure_packages(["requests", "pexpect"])
+        ensure_packages(["requests", "pexpect", "playsound3"])
     except Exception as e:
         print(f"Failed to ensure Python packages on macOS: {e}")
 
@@ -70,7 +70,7 @@ elif system == "Windows":
 
     # Ensure 'requests' and 'pexpect' are installed for the current Python
     try:
-        ensure_packages(["requests", "pexpect"])
+        ensure_packages(["requests", "pexpect", "playsound3"])
     except Exception as e:
         print(f"Failed to ensure Python packages on Windows: {e}")
 else:

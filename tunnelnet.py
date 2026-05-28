@@ -3,6 +3,8 @@ import sys
 import os
 import subprocess
 import ast
+import time
+from playsound3 import playsound
 
 # On macOS, the system Python (3.9) ships with Tk 8.5 which doesn't support
 # macOS 13+ version numbering and will abort on launch. Require Tk 8.6+.
@@ -168,6 +170,7 @@ chat_logs = {}
 #updated information (stuff that needs to be refreshed)
 SELF = {}
 DEVICES = {}
+CLIENTCHATS = 0
 #tunnelnet should only save the clientID. APIKEY cannot be saved and 
 #must be requested at user login.
 #physical control of local API can be done using cli, my idea is to run
@@ -294,13 +297,14 @@ def send_packet(target_device, message):
     Helper to queue a message for sending.
     target_device: hostname from DEVICES dict, or raw IP as fallback.
     """
+    global selfip
     device_entry = DEVICES.get(target_device, target_device)
     # DEVICES stores dicts on Mac ({ip, online}) and plain IP strings on Linux/Windows
     if isinstance(device_entry, dict):
         target_ip = device_entry.get("ip", target_device)
     else:
         target_ip = device_entry
-    sender_name = TAILNAME or socket.gethostname()
+    sender_name = selfip
     payload = {
         "destination": target_device,
         "sender": sender_name,
@@ -404,6 +408,8 @@ def bash_worker():
                     SUDOAUTH = True
                     print("macOS shell initialized (no sudo needed)")
                 
+                #SOFTLOG BYPASS: tailscale up --auth-key=abcd --accept-routes
+
                 result = subprocess.run(
                     cmd, shell=True, capture_output=True, text=True, timeout=30
                 )
@@ -426,7 +432,15 @@ def bash_worker():
                     print("Windows shell initialized")
                 
                 if win_cmd:
-                    STDOUT = win_cmd.execute(cmd, timeout=30)
+                    #windowscmdqueue is stupid and cant return a proper json output so byebye win_cmd
+                    #STDOUT = win_cmd.execute(cmd, timeout=30)
+                    print("SCREW WINDOWSCMDQUEUE")
+                    result = subprocess.run(
+                        cmd, shell=True, capture_output=True, text=True, timeout=30
+                    )
+                    STDOUT = result.stdout.strip()
+                    if result.returncode != 0 and result.stderr:
+                        print(f"cmd stderr: {result.stderr.strip()}")
                 else:
                     result = subprocess.run(
                         cmd, shell=True, capture_output=True, text=True, timeout=30
@@ -443,9 +457,9 @@ def bash_worker():
                         print("Warning: tailscale returned non-JSON output")
                     JSONFLAG = False
 
-            # ---- Linux: ORIGINAL pexpect code (UNTOUCHED) ----
             else:
-                # Authenticate sudo ONCE at the start, not for every command
+                #in order for python on linux to access terminal sensitive commands like tailscale
+                #we need sudo so I programmed an extra window and methods for linux (-sev)
                 if not SUDOAUTH:
                     try:
                         print(f"SUDO not detected on {system}! Injecting...")
@@ -458,7 +472,7 @@ def bash_worker():
                     except Exception as E:
                         print("sudError: ", E)
                         SUDOAUTH = False
-                
+
                 inject.sendline(cmd)
                 inject.expect([r"# ", r"\$ "], timeout=5)
                 
@@ -468,7 +482,6 @@ def bash_worker():
                 if JSONFLAG == True:
                     JSON, index = JSONDECODER.raw_decode(STDOUT)
                     JSONFLAG = False
-
         except Exception as e:
             print("Worker error:", e)
         finally:
@@ -487,12 +500,12 @@ def refreshnet():
     '''
     function for refreshing all information relating to a user's tailnet (devices, ips, etc)
     '''
-    global JSONFLAG, SELF, JSON, TAILNET, STDOUT, TAILNAME, DEVICES
+    global JSONFLAG, SELF, JSON, TAILNET, STDOUT, TAILNAME, DEVICES,selfname,selfip
     try:
         JSONFLAG = True
         cmd_queue.put("tailscale status --json")
         cmd_queue.join()
-        # ---- macOS: custom JSON handling without jq ----
+
         if system == "Darwin":
             health = JSON.get("Health", [])
             if isinstance(health, list):
@@ -527,11 +540,10 @@ def refreshnet():
                 self_ips = self_node.get("TailscaleIPs", [])
                 if self_hostname and self_ips:
                     SELF[self_hostname] = self_ips[0]
-                    DEVICES[self_hostname] = self_ips[0]
+                    DEVICES[self_hostname] = {"ip": self_ips[0], "online": True}
             
             print(f"{len(DEVICES)} device(s) found")
 
-        # ---- Windows: JSON parsing without jq (no jq on Windows) ----
         elif system == "Windows":
             health = JSON.get("Health", [])
             if isinstance(health, list):
@@ -565,11 +577,10 @@ def refreshnet():
                 self_ips = self_node.get("TailscaleIPs", [])
                 if self_hostname and self_ips:
                     SELF[self_hostname] = self_ips[0]
-                    DEVICES[self_hostname] = self_ips[0]
             
             print(f"{len(DEVICES)} device(s) found")
 
-        # ---- Linux: ORIGINAL code (UNTOUCHED) ----
+        #yes yes all the linux code and the backend code was written with AI as DEBUG ONLY by sev!!!
         else:
             if "Tailscale is stopped." in JSON["Health"]:
                 print("tailscale service stopped... restarting...")
@@ -585,8 +596,8 @@ def refreshnet():
                 online = peer_data.get("Online", False)
                 if hostname and ips:
                     DEVICES[hostname] = {"ip": ips[0], "online": online}
-            ##COMMAND SPECIFIC
 
+            #the bash command devices quartet of formatting
             #cmd_queue.put("tailscale status --json | jq -r \'.Peer[] | \"\\(.HostName) \\(.TailscaleIPs[0])\"\'")
             #cmd_queue.put("tailscale status --json | jq -r \'.Peer[] | \"\\(.HostName)\"\'")
             #hostname and ip #tailscale status --json | jq -r '.Peer[] | "\(.HostName) \(.TailscaleIPs[0])"'
@@ -598,8 +609,6 @@ def refreshnet():
             DEVICES = ast.literal_eval(STDOUT)
             '''
 
-            
-
             print(len(DEVICES))
     
         # Device name and IP update
@@ -608,14 +617,14 @@ def refreshnet():
         userlabel.config(text=f"Welcome, {selfname}", fg = 'white', bg = PROFILEBG)
         IPlabel.config(text=f"Logged in from IP {selfip}")
 
-        # Clear existing user rows in serverframe (keep row 0 which is usertitlelabel)
+        #clear rows before you refresh lol (but save row 0 because its a title label)
         barflag = False
         for widget in serverframe.winfo_children():
             info = widget.grid_info()
             if info and str(info.get('row', '0')) != '0':
                 widget.destroy()
 
-            #### SINCE BACKEND WORKS NOW; CODE IS NOW SHARED FOR ALL OS SYSTEM
+            #label handler below (updates labels and some device lists)
             USERrow = 1
             for user, data in DEVICES.items():
                 if user in SELF:
@@ -652,26 +661,23 @@ def refreshnet():
                         homelist.insert(END, str(user))
                         homeiplist.insert(END, str(ip))
 
-            
-              
-            #### INCASE THE SYSTEM DOESN'T WORK, THIS IS THE BACK UP, OLD CODE.
-            # USERrow = 1
-            # for user, ip in DEVICES.items():
-            #     if user in SELF:
-            #         pass
-            #     else:
-            #         DEVICElabel = tk.Label(serverframe, text=str(user), font=("Arial", 12))
-            #         DEVICElabel.grid(column=1, row=USERrow, sticky="w")
-            #         IPDEVICElabel = tk.Label(serverframe, text=str(ip), font=("Arial", 12))
-            #         IPDEVICElabel.grid(column=2, row=USERrow, sticky="w")
-            #         USERrow += 1
-                
+        try:
+            print(DEVICES["IPLOOKUP"])
+        except KeyError:
+            DEVICES["IPLOOKUP"] = {}
+
+        for name in DEVICES:
+            if name == "IPLOOKUP":
+                continue
+            (DEVICES["IPLOOKUP"])[((DEVICES[name])["ip"])] = name
+        
     except Exception as e:
         print("Error:", e)
 
 def requesttoken(cid, cs):
     '''
     Requests an API key if the login function is called. input the preset oauth client id and client secret and output to APIKEY global.
+    \"The important function.\"
     '''
     global APIKEY,CLIENTID,CLIENTSECRET
     token_url = "https://api.tailscale.com/api/v2/oauth/token"
@@ -693,6 +699,8 @@ def listdevices(apikey, tailnet = "-"):
     lists devices from the tailscale api.
     changes methods depending on whether the client has host access or local net access.
     use flag (ISHOST to create if clause.)
+
+    this method is not used anymore but will still be here because frankly I could care less.
     '''
     if ISHOST == True:
         token_url = f"https://api.tailscale.com/api/v2/tailnet/{tailnet}/devices"
@@ -748,19 +756,21 @@ def messaging_service():
     Cross-platform TCP messaging service.
     Handles sending, receiving, and acknowledging messages over MESG_PORT.
     Both sender and receiver store chat logs and confirm delivery via ACK.
+    send_packet("ip", "MESSAGE)
     """
     def handle_connection(conn, addr):
-        """Handle a single incoming TCP connection in its own thread."""
+        """Recieves and handles incoming packets. Processes chat_logs and ACKs."""
         with conn:
             data = conn.recv(4096).decode('utf-8')
             if not data:
-                return
+                return #how would this ever happen lol
             try:
                 msg = json.loads(data)
                 sender = msg.get("sender", "Unknown")
-                channel = sender  # early stage: channel name = sender device name
+                channel = sender  #as for determining the sender of the packet, we look at the contents of the message which should include a "sender" entry
+                #so we name the chat_log() to the same ip in the text
 
-                # Store in chat_logs: chat_logs[channel][timestamp] = {raw, sender, timestamp, read}
+                #when we recieve the message, immediately store it in local chat_logs and ack back
                 if channel not in chat_logs:
                     chat_logs[channel] = {}
 
@@ -772,16 +782,18 @@ def messaging_service():
                     "read": False
                 }
 
-                # ACK: reply repeating and acknowledging the previous message
+                #ack response section below
                 ack = {
                     "status": "ACK",
                     "received_msg": msg.get("message", ""),
                     "original_timestamp": timestamp,
                     "ack_timestamp": str(time.time()),
-                    "sender": TAILNAME or socket.gethostname()
-                }
+                    "sender": selfip
+                } 
                 conn.sendall(json.dumps(ack).encode('utf-8'))
                 print(f"Message received from {sender} ({addr[0]}), ACK sent.")
+                refreshchat()
+                playsound(str(userdir.parent)+"/Assets/notificationNET.mp3", block=False)
             except Exception as e:
                 print(f"Listener error: {e}")
 
@@ -844,7 +856,8 @@ def messaging_service():
                             "timestamp": payload["timestamp"],
                             "read": True  # sender always "read" their own message
                         }
-                        print(f"Message to {dest_name} ({target_ip}) ACK confirmed.")
+                        print(f"Message to {dest_name} ({target_ip}) ACK confirmed at {payload['timestamp']}.")
+                        refreshchat()
                     else:
                         print(f"Unexpected ACK status from {target_ip}: {ack}")
         except Exception as e:
@@ -856,14 +869,97 @@ def selectorfunc(number):
     '''
     selector function for device list in home. insert numbers 0 or 1 for homelist or homeiplist respectively.
     '''
+
+    '''
+    def addchattab():
+        global chattabcount
+        if chattabcount < 20:
+            chattabcount += 1
+            newframe = tk.Frame(chattab)
+            newframe.grid_columnconfigure(0, weight = 1)
+            chattab.add(newframe, text=f"F{chattabcount}")
+            chatframes.append(newframe)
+            chattab.select(newframe)
+        else:
+            pass
+
+    addtabbtn = tk.Button(chattab, text='Add Chat', bg=SELECTBG, fg='white', activebackground=BANNERBG, activeforeground='black', relief='flat', width=2)
+    addtabbtn.config(command = addchattab)
+    addtabbtn.pack(side=LEFT, anchor=NW)
+    '''
+    global CLIENTCHATS, SELF
     if number == 0:
+        CLIENTCHATS += 1
         compsel = homelist.curselection()
         select = compsel[0]
         select = homeiplist.get(compsel[0])
-        print(select)
-    elif number == 1:
-        compsel = homeiplist.curselection()
-        select = homeiplist.get(compsel[0])
+        send_packet(select, f"{selfname} has started a chat with you!")
+        '''
+        select = homelist.get(compsel[0])
+        nframe = Frame(chattab)
+        for i in range(3):
+            nframe.columnconfigure(i, weight=1)
+            nframe.rowconfigure(i, weight=1)
+        chattab.add(nframe, text=f"{select}")
+        chatframes.append(nframe)
+        chattab.select(nframe)
+        '''
+
+def refreshchat():
+    global chat_logs, selfip
+
+    for devices in chat_logs:
+        # devices is the IP key used in chat_logs; map to human name when available
+        devicename = (DEVICES.get("IPLOOKUP", {})).get(devices, devices)
+        tabflag = True
+        # Ensure a tab exists for this device
+        for tab in chattab.tabs():
+            #print(chattab.tab(tab, "text"))
+            if devicename in chattab.tab(tab, "text"):
+                tabflag = False
+        if tabflag == True:
+            nframe = Frame(chattab)
+            for i in range(3):
+                nframe.columnconfigure(i, weight=1)
+            chattab.add(nframe, text=f"{devicename}")
+            chatframes.append(nframe)
+            chattab.select(nframe)
+
+        for tab in chattab.tabs():
+            if devicename in chattab.tab(tab, "text"):
+                currenttab = chattab.nametowidget(tab)
+                for label in currenttab.winfo_children():
+                    label.destroy()
+                for message_key in sorted(chat_logs[devices].keys(), key=float):
+
+                    entry = chat_logs[devices][message_key]
+
+                    messagecontent = entry.get("raw", "")
+                    sender = entry.get("sender", "Unknown")
+                    messagetime = time.ctime(float(entry.get("timestamp", time.time())))
+                    messageread = entry.get("read", False)
+
+                    next_row = currenttab.grid_size()[1]
+                    display_text = f"{sender} ({messagetime}): {messagecontent}"
+                    if sender == selfip:
+                        #my message
+                        message_label = tk.Label(currenttab, text=display_text, anchor="e", justify="right")
+                        message_label.grid(row=next_row, column=2, sticky='e', padx=6, pady=2)
+                    else:
+                        #not this device's message
+                        message_label = tk.Label(currenttab, text=display_text, anchor="w", justify="left")
+                        message_label.grid(row=next_row, column=0, sticky='w', padx=6, pady=2)
+
+            
+
+'''
+
+for tab in chattab.tabs():
+            tiq = chattab.tab(tab, "text")
+            if "Home" in tiq:
+                print("home")
+
+'''
 
 
 msg_thread = threading.Thread(target=messaging_service, daemon=True)
@@ -912,32 +1008,44 @@ def sendMessage():
     if message == "": # checks message content, then stops empty spaces from being sent
         textbox.delete(0, tk.END) # deletes entry text after enter
     else:
+        currenttab = chattab.tab(chattab.select(), "text")
+        if currenttab == "Home":
+            print("Select a device to chat with!")
+            textbox.delete(0, tk.END)
+        else:
+            target_device = DEVICES[currenttab].get("ip")
+            send_packet(target_device, message)
+            textbox.delete(0, tk.END)
+        """
         current_tab = chattab.nametowidget(chattab.select())
         entrytextlabel = tk.Label(current_tab, text=message, anchor="w")
         entrytextlabel.grid(column=0, sticky='w')
         textbox.delete(0, tk.END)
+        """
 
 # Image loading
 try:
     bgimgraw = str(userdir.parent)+"/Assets/computerBackground.png"
     bgimgdata = tk.PhotoImage(file=bgimgraw)
-except:
+except Exception as e:
     bgimgraw = str(userdir.parent)+"/Assets/silly.png"
     bgimgdata = tk.PhotoImage(file=bgimgraw)
+    print(e)
 
 try:
     logoimgraw = str(userdir.parent)+"/Assets/tunnelnetlogo.png"
     logoimgdata = tk.PhotoImage(file=logoimgraw)
-except:
+except Exception as e:
     logoimgraw = str(userdir.parent)+"/Assets/silly.png"
     logoimgdata = tk.PhotoImage(file=logoimgraw)
-
+    print(e)
 try:
     sendimgraw = str(userdir.parent)+"/Assets/sendbutton.png"
     sendimgdata = tk.PhotoImage(file = sendimgraw)
-except:
+except Exception as e:
     sendimgraw = str(userdir.parent) + '/Assets/silly.png'
     sendimgdata = tk.PhotoImage(file = sendimgraw)
+    print(e)
 
 try:
     offlineimgraw = str(userdir.parent)+"/Assets/offlineCircle.png"
@@ -1052,7 +1160,7 @@ homeiplist.grid(row=1,column=1, sticky=NSEW)
 homebar.grid(row=1, column=2, sticky=NSEW)
 
 homelist.bind("<Double-Button-1>", lambda event:selectorfunc(0))
-homeiplist.bind("<Double-Button-1>", lambda event:selectorfunc(1))
+
 #CONTINUE HERE ALTON ########################################################################################
 
 #chatframes.extend([chatframe1, chatframe2, chatframe3]) #Puts chatframe1-3 into chatframes list

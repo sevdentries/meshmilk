@@ -15,4 +15,6 @@ systemctl start tailscaled
 systemctl status tailscaled
 tailscale set --operator=$USER
 pip install requests
+pip install --user --break-system-packages playsound3
+#playsound3 is like 10 lines and 1 function, it really shouldn't hurt right
 echo "tailscale installed."

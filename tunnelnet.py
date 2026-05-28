@@ -4,6 +4,7 @@ import os
 import subprocess
 import ast
 import time
+from playsound3 import playsound
 
 # On macOS, the system Python (3.9) ships with Tk 8.5 which doesn't support
 # macOS 13+ version numbering and will abort on launch. Require Tk 8.6+.
@@ -454,9 +455,9 @@ def bash_worker():
                         print("Warning: tailscale returned non-JSON output")
                     JSONFLAG = False
 
-            # ---- Linux: ORIGINAL pexpect code (UNTOUCHED) ----
             else:
-                # Authenticate sudo ONCE at the start, not for every command
+                #in order for python on linux to access terminal sensitive commands like tailscale
+                #we need sudo so I programmed an extra window and methods for linux (-sev)
                 if not SUDOAUTH:
                     try:
                         print(f"SUDO not detected on {system}! Injecting...")
@@ -503,7 +504,7 @@ def refreshnet():
         JSONFLAG = True
         cmd_queue.put("tailscale status --json")
         cmd_queue.join()
-        # ---- macOS: custom JSON handling without jq ----
+
         if system == "Darwin":
             health = JSON.get("Health", [])
             if isinstance(health, list):
@@ -542,7 +543,6 @@ def refreshnet():
             
             print(f"{len(DEVICES)} device(s) found")
 
-        # ---- Windows: JSON parsing without jq (no jq on Windows) ----
         elif system == "Windows":
             health = JSON.get("Health", [])
             if isinstance(health, list):
@@ -576,11 +576,10 @@ def refreshnet():
                 self_ips = self_node.get("TailscaleIPs", [])
                 if self_hostname and self_ips:
                     SELF[self_hostname] = self_ips[0]
-                    #DEVICES[str(self_hostname)+" (You)"] = self_ips[0]
             
             print(f"{len(DEVICES)} device(s) found")
 
-        # ---- Linux: ORIGINAL code (UNTOUCHED) ----
+        #yes yes all the linux code and the backend code was written with AI as DEBUG ONLY by sev!!!
         else:
             if "Tailscale is stopped." in JSON["Health"]:
                 print("tailscale service stopped... restarting...")
@@ -596,8 +595,8 @@ def refreshnet():
                 online = peer_data.get("Online", False)
                 if hostname and ips:
                     DEVICES[hostname] = {"ip": ips[0], "online": online}
-            ##COMMAND SPECIFIC
 
+            #the bash command devices quartet of formatting
             #cmd_queue.put("tailscale status --json | jq -r \'.Peer[] | \"\\(.HostName) \\(.TailscaleIPs[0])\"\'")
             #cmd_queue.put("tailscale status --json | jq -r \'.Peer[] | \"\\(.HostName)\"\'")
             #hostname and ip #tailscale status --json | jq -r '.Peer[] | "\(.HostName) \(.TailscaleIPs[0])"'
@@ -609,8 +608,6 @@ def refreshnet():
             DEVICES = ast.literal_eval(STDOUT)
             '''
 
-            
-
             print(len(DEVICES))
     
         # Device name and IP update
@@ -619,14 +616,14 @@ def refreshnet():
         userlabel.config(text=f"Welcome, {selfname}")
         IPlabel.config(text=f"Logged in from IP {selfip}")
 
-        # Clear existing user rows in serverframe (keep row 0 which is usertitlelabel)
+        #clear rows before you refresh lol (but save row 0 because its a title label)
         barflag = False
         for widget in serverframe.winfo_children():
             info = widget.grid_info()
             if info and str(info.get('row', '0')) != '0':
                 widget.destroy()
 
-            #### SINCE BACKEND WORKS NOW; CODE IS NOW SHARED FOR ALL OS SYSTEM
+            #label handler below (updates labels and some device lists)
             USERrow = 1
             for user, data in DEVICES.items():
                 if user in SELF:
@@ -656,19 +653,6 @@ def refreshnet():
                         homelist.insert(END, str(user))
                         homeiplist.insert(END, str(ip))
 
-            
-              
-            #### INCASE THE SYSTEM DOESN'T WORK, THIS IS THE BACK UP, OLD CODE.
-            # USERrow = 1
-            # for user, ip in DEVICES.items():
-            #     if user in SELF:
-            #         pass
-            #     else:
-            #         DEVICElabel = tk.Label(serverframe, text=str(user), font=("Arial", 12))
-            #         DEVICElabel.grid(column=1, row=USERrow, sticky="w")
-            #         IPDEVICElabel = tk.Label(serverframe, text=str(ip), font=("Arial", 12))
-            #         IPDEVICElabel.grid(column=2, row=USERrow, sticky="w")
-            #         USERrow += 1
         try:
             print(DEVICES["IPLOOKUP"])
         except KeyError:
@@ -685,6 +669,7 @@ def refreshnet():
 def requesttoken(cid, cs):
     '''
     Requests an API key if the login function is called. input the preset oauth client id and client secret and output to APIKEY global.
+    \"The important function.\"
     '''
     global APIKEY,CLIENTID,CLIENTSECRET
     token_url = "https://api.tailscale.com/api/v2/oauth/token"
@@ -706,6 +691,8 @@ def listdevices(apikey, tailnet = "-"):
     lists devices from the tailscale api.
     changes methods depending on whether the client has host access or local net access.
     use flag (ISHOST to create if clause.)
+
+    this method is not used anymore but will still be here because frankly I could care less.
     '''
     if ISHOST == True:
         token_url = f"https://api.tailscale.com/api/v2/tailnet/{tailnet}/devices"
@@ -764,17 +751,18 @@ def messaging_service():
     send_packet("ip", "MESSAGE)
     """
     def handle_connection(conn, addr):
-        """Handle a single incoming TCP connection in its own thread."""
+        """Recieves and handles incoming packets. Processes chat_logs and ACKs."""
         with conn:
             data = conn.recv(4096).decode('utf-8')
             if not data:
-                return
+                return #how would this ever happen lol
             try:
                 msg = json.loads(data)
                 sender = msg.get("sender", "Unknown")
-                channel = sender  # early stage: channel name = sender device name
+                channel = sender  #as for determining the sender of the packet, we look at the contents of the message which should include a "sender" entry
+                #so we name the chat_log() to the same ip in the text
 
-                # Store in chat_logs: chat_logs[channel][timestamp] = {raw, sender, timestamp, read}
+                #when we recieve the message, immediately store it in local chat_logs and ack back
                 if channel not in chat_logs:
                     chat_logs[channel] = {}
 
@@ -786,7 +774,7 @@ def messaging_service():
                     "read": False
                 }
 
-                # ACK: reply repeating and acknowledging the previous message
+                #ack response section below
                 ack = {
                     "status": "ACK",
                     "received_msg": msg.get("message", ""),
@@ -797,6 +785,7 @@ def messaging_service():
                 conn.sendall(json.dumps(ack).encode('utf-8'))
                 print(f"Message received from {sender} ({addr[0]}), ACK sent.")
                 refreshchat()
+                playsound(str(userdir.parent)+"/Assets/notificationNET.mp3", block=False)
             except Exception as e:
                 print(f"Listener error: {e}")
 

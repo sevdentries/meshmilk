@@ -408,6 +408,8 @@ def bash_worker():
                     SUDOAUTH = True
                     print("macOS shell initialized (no sudo needed)")
                 
+                #SOFTLOG BYPASS: tailscale up --auth-key=abcd --accept-routes
+
                 result = subprocess.run(
                     cmd, shell=True, capture_output=True, text=True, timeout=30
                 )
@@ -480,7 +482,6 @@ def bash_worker():
                 if JSONFLAG == True:
                     JSON, index = JSONDECODER.raw_decode(STDOUT)
                     JSONFLAG = False
-
         except Exception as e:
             print("Worker error:", e)
         finally:
@@ -1021,28 +1022,27 @@ logoimglink = 'https://raw.githubusercontent.com/sevdentries/tunnelnet/refs/head
 sendimglink = 'https://raw.githubusercontent.com/sevdentries/tunnelnet/refs/heads/main-frontend/Assets/icons8-send-96.png'
 
 try:
-    with urlopen(bgimglink) as img1:
-        bgimgraw = img1.read()
-    bgimgdata = tk.PhotoImage(data=bgimgraw)
-except:
+    bgimgraw = str(userdir.parent)+"/Assets/computerBackground.png"
+    bgimgdata = tk.PhotoImage(file=bgimgraw)
+except Exception as e:
     bgimgraw = str(userdir.parent)+"/Assets/silly.png"
     bgimgdata = tk.PhotoImage(file=bgimgraw)
+    print(e)
 
 try:
-    with urlopen(logoimglink) as img2:
-        logoimgraw = img2.read()
-    logoimgdata = tk.PhotoImage(data=logoimgraw)
-except:
+    logoimgraw = str(userdir.parent)+"/Assets/tunnelnetlogo.png"
+    logoimgdata = tk.PhotoImage(file=logoimgraw)
+except Exception as e:
     logoimgraw = str(userdir.parent)+"/Assets/silly.png"
     logoimgdata = tk.PhotoImage(file=logoimgraw)
-
+    print(e)
 try:
-    with urlopen(sendimglink) as img3:
-        sendimgraw = img3.read()
-    sendimgdata = tk.PhotoImage(data = sendimgraw)
-except:
+    sendimgraw = str(userdir.parent)+"/Assets/sendbutton.png"
+    sendimgdata = tk.PhotoImage(file = sendimgraw)
+except Exception as e:
     sendimgraw = str(userdir.parent) + '/Assets/silly.png'
     sendimgdata = tk.PhotoImage(file = sendimgraw)
+    print(e)
 
 # Images variables
 bgimg = bgimgdata.subsample(1,5)

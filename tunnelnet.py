@@ -605,7 +605,7 @@ def refreshnet():
         # Device name and IP update
         selfname = (JSON["Self"])["HostName"]
         selfip = ((JSON["Self"])["TailscaleIPs"])[0]
-        userlabel.config(text=f"Welcome, {selfname}")
+        userlabel.config(text=f"Welcome, {selfname}", fg = 'white', bg = PROFILEBG)
         IPlabel.config(text=f"Logged in from IP {selfip}")
 
         # Clear existing user rows in serverframe (keep row 0 which is usertitlelabel)
@@ -638,10 +638,10 @@ def refreshnet():
 
 
 
-                    DEVICElabel = tk.Label(serverframe, text=str(user), font=("Arial", 12))
+                    DEVICElabel = tk.Label(serverframe, text=str(user), font=("Arial", 12), fg = 'white', bg = SERVERBG)
                     DEVICElabel.grid(column=2, row=USERrow, sticky="w")
 
-                    IPDEVICElabel = tk.Label(serverframe, text=str(ip), font=("Arial", 12))
+                    IPDEVICElabel = tk.Label(serverframe, text=str(ip), font=("Arial", 12), fg = 'white', bg = SERVERBG)
                     IPDEVICElabel.grid(column=3, row=USERrow, sticky="w")
                     USERrow += 1
                     if not homelist.index('end') == len(DEVICES):
@@ -989,13 +989,13 @@ profileframe.grid_rowconfigure(3, weight=1)
 logoimglabel = tk.Label(profileframe, image=logoimg, border=0)
 logoimglabel.grid(column=0, row=0, padx=20, pady=20, rowspan=3)
 
-namelabel = tk.Label(profileframe, text="tunnelNET", font=("Arial", 20))
+namelabel = tk.Label(profileframe, text="tunnelNET", font=("Arial", 20), fg = 'white', bg = PROFILEBG)
 namelabel.grid(column=1, row=0)
 
 userlabel = tk.Label(profileframe, text=f"Welcome, {selfname}", font=("Arial", 10))
 userlabel.grid(column=1, row=1)
 
-IPlabel = tk.Label(profileframe, text=f"Logged in from IP {selfip}", font=("Arial", 10))
+IPlabel = tk.Label(profileframe, text=f"Logged in from IP {selfip}", font=("Arial", 10), fg = 'white', bg = PROFILEBG)
 IPlabel.grid(column=1, row=2)
 
 # Server frame (users and other online people); part of Profileframe
@@ -1009,7 +1009,7 @@ serverframe.grid_rowconfigure(0, weight=1)
 for i in range(100):
     serverframe.grid_rowconfigure(i+1, weight=2)
 
-usertitlelabel = tk.Label(serverframe, text='Users Found', font=200)
+usertitlelabel = tk.Label(serverframe, text='Users Found', font=200, fg = 'white', bg = SERVERBG)
 usertitlelabel.grid(column=0, row=0, columnspan=2, sticky=NW, padx=20, pady=20)
 
 def refresh():

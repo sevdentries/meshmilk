@@ -15,4 +15,5 @@ systemctl start tailscaled
 systemctl status tailscaled
 tailscale set --operator=$USER
 pip install requests
+pip install playsound3
 echo "tailscale installed."

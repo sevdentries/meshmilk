@@ -3,6 +3,7 @@ import sys
 import os
 import subprocess
 import ast
+import time
 
 # On macOS, the system Python (3.9) ships with Tk 8.5 which doesn't support
 # macOS 13+ version numbering and will abort on launch. Require Tk 8.6+.
@@ -428,7 +429,15 @@ def bash_worker():
                     print("Windows shell initialized")
                 
                 if win_cmd:
-                    STDOUT = win_cmd.execute(cmd, timeout=30)
+                    #windowscmdqueue is stupid and cant return a proper json output so byebye win_cmd
+                    #STDOUT = win_cmd.execute(cmd, timeout=30)
+                    print("SCREW WINDOWSCMDQUEUE")
+                    result = subprocess.run(
+                        cmd, shell=True, capture_output=True, text=True, timeout=30
+                    )
+                    STDOUT = result.stdout.strip()
+                    if result.returncode != 0 and result.stderr:
+                        print(f"cmd stderr: {result.stderr.strip()}")
                 else:
                     result = subprocess.run(
                         cmd, shell=True, capture_output=True, text=True, timeout=30
@@ -529,7 +538,7 @@ def refreshnet():
                 self_ips = self_node.get("TailscaleIPs", [])
                 if self_hostname and self_ips:
                     SELF[self_hostname] = self_ips[0]
-                    DEVICES[self_hostname] = self_ips[0]
+                    DEVICES[self_hostname] = {"ip": self_ips[0], "online": True}
             
             print(f"{len(DEVICES)} device(s) found")
 
@@ -787,6 +796,7 @@ def messaging_service():
                 } 
                 conn.sendall(json.dumps(ack).encode('utf-8'))
                 print(f"Message received from {sender} ({addr[0]}), ACK sent.")
+                refreshchat()
             except Exception as e:
                 print(f"Listener error: {e}")
 
@@ -850,6 +860,7 @@ def messaging_service():
                             "read": True  # sender always "read" their own message
                         }
                         print(f"Message to {dest_name} ({target_ip}) ACK confirmed.")
+                        refreshchat()
                     else:
                         print(f"Unexpected ACK status from {target_ip}: {ack}")
         except Exception as e:
@@ -885,7 +896,7 @@ def selectorfunc(number):
         compsel = homelist.curselection()
         select = compsel[0]
         select = homeiplist.get(compsel[0])
-        send_packet(select, f"hello from {selfip}!")
+        send_packet(select, f"{selfname} has started a chat with you!")
         '''
         select = homelist.get(compsel[0])
         nframe = Frame(chattab)
@@ -898,21 +909,44 @@ def selectorfunc(number):
         '''
 
 def refreshchat():
-    global chat_logs
-    
-    for devices in chat_logs():
-        devicename = (DEVICES["IPLOOKUP"])[devices] #
+    global chat_logs, selfip
+
+    for devices in chat_logs:
+        # devices is the IP key used in chat_logs; map to human name when available
+        devicename = (DEVICES.get("IPLOOKUP", {})).get(devices, devices)
+
+        # Ensure a tab exists for this device
         for tab in chattab.tabs():
-            if not devicename in chattab.tab(tab, "text"):
-                print("chat opened with "+ devicename)
+            if devicename not in chattab.tab(tab, "text"):
                 nframe = Frame(chattab)
                 for i in range(3):
                     nframe.columnconfigure(i, weight=1)
-                    nframe.rowconfigure(i, weight=1)
                 chattab.add(nframe, text=f"{devicename}")
                 chatframes.append(nframe)
                 chattab.select(nframe)
-        #NOW UPDATE CHATS FOR TABS
+
+        for tab in chattab.tabs():
+            if devicename in chattab.tab(tab, "text"):
+                currenttab = chattab.nametowidget(tab)
+                for message_key in sorted(chat_logs[devices].keys(), key=float):
+                    entry = chat_logs[devices][message_key]
+                    messagecontent = entry.get("raw", "")
+                    sender = entry.get("sender", "Unknown")
+                    messagetime = time.ctime(float(entry.get("timestamp", time.time())))
+                    messageread = entry.get("read", False)
+                    if not messageread:
+                        next_row = currenttab.grid_size()[1]
+                        display_text = f"{sender} ({messagetime}): {messagecontent}"
+                        if sender == selfip:
+                            #my message
+                            message_label = tk.Label(currenttab, text=display_text, anchor="e", justify="right")
+                            message_label.grid(row=next_row, column=2, sticky='e', padx=6, pady=2)
+                        else:
+                            #not this device's message
+                            message_label = tk.Label(currenttab, text=display_text, anchor="w", justify="left")
+                            message_label.grid(row=next_row, column=0, sticky='w', padx=6, pady=2)
+
+                        entry["read"] = True
             
 
 '''

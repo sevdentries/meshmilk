@@ -914,39 +914,45 @@ def refreshchat():
     for devices in chat_logs:
         # devices is the IP key used in chat_logs; map to human name when available
         devicename = (DEVICES.get("IPLOOKUP", {})).get(devices, devices)
-
+        tabflag = True
         # Ensure a tab exists for this device
         for tab in chattab.tabs():
-            if devicename not in chattab.tab(tab, "text"):
-                nframe = Frame(chattab)
-                for i in range(3):
-                    nframe.columnconfigure(i, weight=1)
-                chattab.add(nframe, text=f"{devicename}")
-                chatframes.append(nframe)
-                chattab.select(nframe)
+            print(chattab.tab(tab, "text"))
+            if devicename in chattab.tab(tab, "text"):
+                tabflag = False
+        if tabflag == True:
+            nframe = Frame(chattab)
+            for i in range(3):
+                nframe.columnconfigure(i, weight=1)
+            chattab.add(nframe, text=f"{devicename}")
+            chatframes.append(nframe)
+            chattab.select(nframe)
 
         for tab in chattab.tabs():
             if devicename in chattab.tab(tab, "text"):
                 currenttab = chattab.nametowidget(tab)
+                for label in currenttab.winfo_children():
+                    label.destroy()
                 for message_key in sorted(chat_logs[devices].keys(), key=float):
+
                     entry = chat_logs[devices][message_key]
+
                     messagecontent = entry.get("raw", "")
                     sender = entry.get("sender", "Unknown")
                     messagetime = time.ctime(float(entry.get("timestamp", time.time())))
                     messageread = entry.get("read", False)
-                    if not messageread:
-                        next_row = currenttab.grid_size()[1]
-                        display_text = f"{sender} ({messagetime}): {messagecontent}"
-                        if sender == selfip:
-                            #my message
-                            message_label = tk.Label(currenttab, text=display_text, anchor="e", justify="right")
-                            message_label.grid(row=next_row, column=2, sticky='e', padx=6, pady=2)
-                        else:
-                            #not this device's message
-                            message_label = tk.Label(currenttab, text=display_text, anchor="w", justify="left")
-                            message_label.grid(row=next_row, column=0, sticky='w', padx=6, pady=2)
 
-                        entry["read"] = True
+                    next_row = currenttab.grid_size()[1]
+                    display_text = f"{sender} ({messagetime}): {messagecontent}"
+                    if sender == selfip:
+                        #my message
+                        message_label = tk.Label(currenttab, text=display_text, anchor="e", justify="right")
+                        message_label.grid(row=next_row, column=2, sticky='e', padx=6, pady=2)
+                    else:
+                        #not this device's message
+                        message_label = tk.Label(currenttab, text=display_text, anchor="w", justify="left")
+                        message_label.grid(row=next_row, column=0, sticky='w', padx=6, pady=2)
+
             
 
 '''
@@ -1010,7 +1016,7 @@ def sendMessage():
             print("Select a device to chat with!")
             textbox.delete(0, tk.END)
         else:
-            target_device = currenttab
+            target_device = DEVICES[currenttab].get("ip")
             send_packet(target_device, message)
             textbox.delete(0, tk.END)
         """

@@ -295,13 +295,14 @@ def send_packet(target_device, message):
     Helper to queue a message for sending.
     target_device: hostname from DEVICES dict, or raw IP as fallback.
     """
+    global selfip
     device_entry = DEVICES.get(target_device, target_device)
     # DEVICES stores dicts on Mac ({ip, online}) and plain IP strings on Linux/Windows
     if isinstance(device_entry, dict):
         target_ip = device_entry.get("ip", target_device)
     else:
         target_ip = device_entry
-    sender_name = TAILNAME or socket.gethostname()
+    sender_name = selfip
     payload = {
         "destination": target_device,
         "sender": sender_name,
@@ -566,7 +567,7 @@ def refreshnet():
                 self_ips = self_node.get("TailscaleIPs", [])
                 if self_hostname and self_ips:
                     SELF[self_hostname] = self_ips[0]
-                    DEVICES[self_hostname] = self_ips[0]
+                    #DEVICES[str(self_hostname)+" (You)"] = self_ips[0]
             
             print(f"{len(DEVICES)} device(s) found")
 
@@ -659,7 +660,16 @@ def refreshnet():
             #         IPDEVICElabel = tk.Label(serverframe, text=str(ip), font=("Arial", 12))
             #         IPDEVICElabel.grid(column=2, row=USERrow, sticky="w")
             #         USERrow += 1
-                
+        try:
+            print(DEVICES["IPLOOKUP"])
+        except KeyError:
+            DEVICES["IPLOOKUP"] = {}
+
+        for name in DEVICES:
+            if name == "IPLOOKUP":
+                continue
+            (DEVICES["IPLOOKUP"])[((DEVICES[name])["ip"])] = name
+        
     except Exception as e:
         print("Error:", e)
 
@@ -773,8 +783,8 @@ def messaging_service():
                     "received_msg": msg.get("message", ""),
                     "original_timestamp": timestamp,
                     "ack_timestamp": str(time.time()),
-                    "sender": TAILNAME or socket.gethostname()
-                }
+                    "sender": selfip
+                } 
                 conn.sendall(json.dumps(ack).encode('utf-8'))
                 print(f"Message received from {sender} ({addr[0]}), ACK sent.")
             except Exception as e:
@@ -875,7 +885,8 @@ def selectorfunc(number):
         compsel = homelist.curselection()
         select = compsel[0]
         select = homeiplist.get(compsel[0])
-        send_packet(select, f"hello from {select}!")
+        send_packet(select, f"hello from {selfip}!")
+        '''
         select = homelist.get(compsel[0])
         nframe = Frame(chattab)
         for i in range(3):
@@ -884,11 +895,35 @@ def selectorfunc(number):
         chattab.add(nframe, text=f"{select}")
         chatframes.append(nframe)
         chattab.select(nframe)
+        '''
 
 def refreshchat():
     global chat_logs
+    
     for devices in chat_logs():
-        pass
+        devicename = (DEVICES["IPLOOKUP"])[devices] #
+        for tab in chattab.tabs():
+            if not devicename in chattab.tab(tab, "text"):
+                print("chat opened with "+ devicename)
+                nframe = Frame(chattab)
+                for i in range(3):
+                    nframe.columnconfigure(i, weight=1)
+                    nframe.rowconfigure(i, weight=1)
+                chattab.add(nframe, text=f"{devicename}")
+                chatframes.append(nframe)
+                chattab.select(nframe)
+        #NOW UPDATE CHATS FOR TABS
+            
+
+'''
+
+for tab in chattab.tabs():
+            tiq = chattab.tab(tab, "text")
+            if "Home" in tiq:
+                print("home")
+
+'''
+
 
 msg_thread = threading.Thread(target=messaging_service, daemon=True)
 msg_thread.start()
@@ -936,10 +971,20 @@ def sendMessage():
     if message == "": # checks message content, then stops empty spaces from being sent
         textbox.delete(0, tk.END) # deletes entry text after enter
     else:
+        currenttab = chattab.tab(chattab.select(), "text")
+        if currenttab == "Home":
+            print("Select a device to chat with!")
+            textbox.delete(0, tk.END)
+        else:
+            target_device = currenttab
+            send_packet(target_device, message)
+            textbox.delete(0, tk.END)
+        """
         current_tab = chattab.nametowidget(chattab.select())
         entrytextlabel = tk.Label(current_tab, text=message, anchor="w")
         entrytextlabel.grid(column=0, sticky='w')
         textbox.delete(0, tk.END)
+        """
 
 # Image loading
 bgimglink = 'https://raw.githubusercontent.com/sevdentries/tunnelnet/refs/heads/main/Assets/computerBackground.png'

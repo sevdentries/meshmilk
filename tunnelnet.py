@@ -470,7 +470,7 @@ def bash_worker():
                     except Exception as E:
                         print("sudError: ", E)
                         SUDOAUTH = False
-                
+
                 inject.sendline(cmd)
                 inject.expect([r"# ", r"\$ "], timeout=5)
                 

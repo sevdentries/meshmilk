@@ -859,7 +859,7 @@ def messaging_service():
                             "timestamp": payload["timestamp"],
                             "read": True  # sender always "read" their own message
                         }
-                        print(f"Message to {dest_name} ({target_ip}) ACK confirmed.")
+                        print(f"Message to {dest_name} ({target_ip}) ACK confirmed at {payload['timestamp']}.")
                         refreshchat()
                     else:
                         print(f"Unexpected ACK status from {target_ip}: {ack}")
@@ -917,7 +917,7 @@ def refreshchat():
         tabflag = True
         # Ensure a tab exists for this device
         for tab in chattab.tabs():
-            print(chattab.tab(tab, "text"))
+            #print(chattab.tab(tab, "text"))
             if devicename in chattab.tab(tab, "text"):
                 tabflag = False
         if tabflag == True:

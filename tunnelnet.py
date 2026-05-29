@@ -624,42 +624,42 @@ def refreshnet():
             if info and str(info.get('row', '0')) != '0':
                 widget.destroy()
 
-            #label handler below (updates labels and some device lists)
-            USERrow = 1
-            for user, data in DEVICES.items():
-                if user in SELF:
-                    pass
+        #label handler below (updates labels and some device lists)
+        USERrow = 1
+        for user, data in DEVICES.items():
+            if user in SELF or user == 'IPLOOKUP':
+                pass
+            else:
+                online = data.get('online', False)
+                if online == False:
+                    status = 'Offline'
+                    STATUSlabel = tk.Label(serverframe, text=str(status), font=("Arial", 12), fg = 'white', bg = SERVERBG)
+                    Statuslabeliconoffline = tk.Label(serverframe, image = offlineimg, border = 0, fg = 'white', bg = SERVERBG)
+                    STATUSlabel.grid(column=1, row=USERrow, sticky="w")
+                    Statuslabeliconoffline.grid(column = 0, row = USERrow, sticky = 'e', padx = 20)
                 else:
-                    online = data.get('online', False)
-                    if online == False:
-                        status = 'Offline'
-                        STATUSlabel = tk.Label(serverframe, text=str(status), font=("Arial", 12), fg = 'white', bg = SERVERBG)
-                        Statuslabeliconoffline = tk.Label(serverframe, image = offlineimg, border = 0, fg = 'white', bg = SERVERBG)
-                        STATUSlabel.grid(column=1, row=USERrow, sticky="w")
-                        Statuslabeliconoffline.grid(column = 0, row = USERrow, sticky = 'e', padx = 20)
-                    else:
-                        status = 'Online'
-                        STATUSlabel = tk.Label(serverframe, text=str(status), font=("Arial", 12), fg = 'white', bg = SERVERBG)
-                        Statuslabeliconoffline = tk.Label(serverframe, image = onlineimg, border = 0, fg = 'white', bg = SERVERBG)
-                        STATUSlabel.grid(column=1, row=USERrow, sticky="w")
-                        Statuslabeliconoffline.grid(column = 0, row = USERrow, sticky = 'e', padx = 20)
-                    ip = str(data['ip'])
+                    status = 'Online'
+                    STATUSlabel = tk.Label(serverframe, text=str(status), font=("Arial", 12), fg = 'white', bg = SERVERBG)
+                    Statuslabeliconoffline = tk.Label(serverframe, image = onlineimg, border = 0, fg = 'white', bg = SERVERBG)
+                    STATUSlabel.grid(column=1, row=USERrow, sticky="w")
+                    Statuslabeliconoffline.grid(column = 0, row = USERrow, sticky = 'e', padx = 20)
+                ip = str(data['ip'])
 
 
 
-                    DEVICElabel = tk.Label(serverframe, text=str(user), font=("Arial", 12), fg = 'white', bg = SERVERBG)
-                    DEVICElabel.grid(column=2, row=USERrow, sticky="w")
+                DEVICElabel = tk.Label(serverframe, text=str(user), font=("Arial", 12), fg = 'white', bg = SERVERBG)
+                DEVICElabel.grid(column=2, row=USERrow, sticky="w")
 
-                    IPDEVICElabel = tk.Label(serverframe, text=str(ip), font=("Arial", 12), fg = 'white', bg = SERVERBG)
-                    IPDEVICElabel.grid(column=3, row=USERrow, sticky="w")
-                    USERrow += 1
-                    if not homelist.index('end') == len(DEVICES):
-                        if not barflag:
-                            homelist.delete(0,END)
-                            homeiplist.delete(0,END)
-                            barflag = True
-                        homelist.insert(END, str(user))
-                        homeiplist.insert(END, str(ip))
+                IPDEVICElabel = tk.Label(serverframe, text=str(ip), font=("Arial", 12), fg = 'white', bg = SERVERBG)
+                IPDEVICElabel.grid(column=3, row=USERrow, sticky="w")
+                USERrow += 1
+                if not homelist.index('end') == len(DEVICES):
+                    if not barflag:
+                        homelist.delete(0,END)
+                        homeiplist.delete(0,END)
+                        barflag = True
+                    homelist.insert(END, str(user))
+                    homeiplist.insert(END, str(ip))
 
         try:
             print(DEVICES["IPLOOKUP"])

@@ -1025,7 +1025,7 @@ def sendMessage():
 
 # Image loading
 try:
-    bgimgraw = str(userdir.parent)+"/Assets/computerBackground.png"
+    bgimgraw = str(userdir.parent)+"/Assets/TunnelNetBanner.png"
     bgimgdata = tk.PhotoImage(file=bgimgraw)
 except Exception as e:
     bgimgraw = str(userdir.parent)+"/Assets/silly.png"
@@ -1067,8 +1067,12 @@ except:
     refreshimgraw = str(userdir.parent) + '/Assets/silly.png'
     refreshimgdata = tk.PhotoImage(file = refreshimgraw)
 
+
+
+
 # Images variables
-bgimg = bgimgdata.subsample(1,5)
+bgimg = bgimgdata.subsample(1,1)
+bgimg = bgimg.zoom(1,1)
 logoimg = logoimgdata.subsample(5,5)
 sendimg = sendimgdata.subsample(2,4)
 onlineimg = onlineimgdata.subsample(1, 1)
